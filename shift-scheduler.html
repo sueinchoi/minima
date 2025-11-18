@@ -1,0 +1,696 @@
+---
+layout: default
+title: 병원 당직표 생성기
+---
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 1024px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .input-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .result-section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .person-entry {
+            background: white;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+        }
+
+        .person-entry h3 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+            font-size: 16px;
+        }
+
+        label {
+            display: block;
+            margin: 8px 0 4px 0;
+            font-weight: 500;
+            color: #555;
+            font-size: 14px;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 5px 0;
+        }
+
+        .checkbox-group label {
+            display: inline-flex;
+            align-items: center;
+            margin: 0;
+            font-weight: normal;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            margin-right: 5px;
+        }
+
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: background 0.3s;
+            margin: 5px;
+        }
+
+        button:hover {
+            background: #2980b9;
+        }
+
+        button.secondary {
+            background: #95a5a6;
+        }
+
+        button.secondary:hover {
+            background: #7f8c8d;
+        }
+
+        button.danger {
+            background: #e74c3c;
+        }
+
+        button.danger:hover {
+            background: #c0392b;
+        }
+
+        .button-group {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .calendar {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .calendar-day {
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 5px;
+            background: white;
+            min-height: 100px;
+        }
+
+        .calendar-day.week1 { background: #fff5f5; }
+        .calendar-day.week2 { background: #f5f9ff; }
+        .calendar-day.week3 { background: #f5fff5; }
+        .calendar-day.week4 { background: #fffef5; }
+
+        .day-header {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 8px;
+            padding-bottom: 5px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .day-number {
+            font-size: 18px;
+            color: #3498db;
+        }
+
+        .duty-assignment {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+
+        .duty-primary {
+            color: #e74c3c;
+            font-weight: 600;
+        }
+
+        .duty-secondary {
+            color: #3498db;
+            font-weight: 500;
+        }
+
+        .stats {
+            background: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .stat-item {
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            border-left: 3px solid #3498db;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+
+        .alert-error {
+            background: #fee;
+            border-left: 4px solid #e74c3c;
+            color: #c0392b;
+        }
+
+        .alert-success {
+            background: #efe;
+            border-left: 4px solid #27ae60;
+            color: #229954;
+        }
+
+        .alert-info {
+            background: #eff;
+            border-left: 4px solid #3498db;
+            color: #2471a3;
+        }
+
+        .small-text {
+            font-size: 12px;
+            color: #7f8c8d;
+            font-style: italic;
+        }
+
+        .add-person-form {
+            background: #e8f4f8;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+
+        .preference-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            margin-left: 5px;
+        }
+
+        .badge-2nd-preferred {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge-2nd-limited {
+            background: #fff3cd;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <h1>🏥 병원 당직표 자동 생성기</h1>
+
+    <div class="container">
+        <!-- Input Section -->
+        <div class="input-section">
+            <h2>📋 인원 관리</h2>
+
+            <div class="add-person-form">
+                <h3>새 인원 추가</h3>
+                <label>이름</label>
+                <input type="text" id="newPersonName" placeholder="이름 입력">
+
+                <label>불가능한 요일 (당직)</label>
+                <div class="checkbox-group">
+                    <label><input type="checkbox" value="월" class="new-unavailable-day"> 월</label>
+                    <label><input type="checkbox" value="화" class="new-unavailable-day"> 화</label>
+                    <label><input type="checkbox" value="수" class="new-unavailable-day"> 수</label>
+                    <label><input type="checkbox" value="목" class="new-unavailable-day"> 목</label>
+                    <label><input type="checkbox" value="금" class="new-unavailable-day"> 금</label>
+                </div>
+
+                <label>대체 가능 요일 (2nd duty로 가능)</label>
+                <div class="checkbox-group">
+                    <label><input type="checkbox" value="월" class="new-alternative-day"> 월</label>
+                    <label><input type="checkbox" value="화" class="new-alternative-day"> 화</label>
+                    <label><input type="checkbox" value="수" class="new-alternative-day"> 수</label>
+                    <label><input type="checkbox" value="목" class="new-alternative-day"> 목</label>
+                    <label><input type="checkbox" value="금" class="new-alternative-day"> 금</label>
+                </div>
+
+                <label>최대 당직 횟수</label>
+                <input type="number" id="newPersonMaxDuties" value="5" min="0" max="20">
+
+                <label>2nd Duty 선호도</label>
+                <select id="newPersonSecondDutyPref">
+                    <option value="normal">일반</option>
+                    <option value="preferred">선호 (무제한)</option>
+                    <option value="limited">제한적 (1회만)</option>
+                </select>
+
+                <div class="button-group">
+                    <button onclick="addPerson()">➕ 인원 추가</button>
+                </div>
+            </div>
+
+            <div id="personList"></div>
+
+            <div class="button-group">
+                <button onclick="loadSampleData()">📝 예시 데이터 불러오기</button>
+                <button onclick="clearAllData()" class="danger">🗑️ 전체 삭제</button>
+            </div>
+        </div>
+
+        <!-- Result Section -->
+        <div class="result-section">
+            <h2>📅 당직표</h2>
+
+            <div class="button-group">
+                <button onclick="generateSchedule()">🎯 당직표 생성</button>
+                <button onclick="exportSchedule()" class="secondary">💾 내보내기</button>
+            </div>
+
+            <div id="messages"></div>
+            <div id="calendar"></div>
+            <div id="statistics"></div>
+        </div>
+    </div>
+
+    <script>
+        // Global data
+        let people = [];
+        let schedule = null;
+        const DAYS_OF_WEEK = ['월', '화', '수', '목', '금'];
+        const TOTAL_DAYS = 20;
+        const WEEKS = 4;
+
+        // Person class
+        class Person {
+            constructor(name, unavailableDays, alternativeDays, maxDuties, secondDutyPref) {
+                this.name = name;
+                this.unavailableDays = unavailableDays || [];
+                this.alternativeDays = alternativeDays || [];
+                this.maxDuties = maxDuties || 5;
+                this.secondDutyPref = secondDutyPref || 'normal'; // 'normal', 'preferred', 'limited'
+                this.primaryCount = 0;
+                this.secondaryCount = 0;
+            }
+
+            canDoPrimaryDuty(dayOfWeek) {
+                return !this.unavailableDays.includes(dayOfWeek);
+            }
+
+            canDoSecondaryDuty(dayOfWeek) {
+                if (this.unavailableDays.includes(dayOfWeek)) {
+                    return this.alternativeDays.includes(dayOfWeek);
+                }
+                return true;
+            }
+
+            getTotalDuties() {
+                return this.primaryCount + this.secondaryCount;
+            }
+
+            canTakeMoreDuties() {
+                if (this.secondDutyPref === 'preferred') {
+                    return true; // Unlimited for 2nd duty preferred
+                }
+                if (this.secondDutyPref === 'limited' && this.secondaryCount >= 1) {
+                    return this.primaryCount < this.maxDuties;
+                }
+                return this.getTotalDuties() < this.maxDuties;
+            }
+        }
+
+        // Load sample data
+        function loadSampleData() {
+            people = [
+                new Person('김나영', ['화', '목', '금'], [], 3, 'normal'),
+                new Person('이현규', [], [], 20, 'preferred'),
+                new Person('이정수', ['수', '목'], ['수'], 5, 'normal'),
+                new Person('유영철', ['수', '목', '금'], [], 3, 'normal'),
+                new Person('서지우', ['월', '화'], ['월'], 5, 'normal'),
+                new Person('이민정', ['화', '수'], ['화'], 5, 'normal'),
+                new Person('공희정', ['월', '화'], ['월'], 5, 'normal'),
+                new Person('문지애', ['목', '금'], ['목'], 5, 'normal'),
+                new Person('전병남', ['수', '목'], ['수'], 5, 'normal'),
+                new Person('노현정', ['화', '수'], ['화'], 5, 'normal'),
+                new Person('백지원', [], [], 5, 'limited'),
+                new Person('박수정', ['금', '월'], ['금'], 5, 'normal')
+            ];
+            renderPersonList();
+            showMessage('예시 데이터가 로드되었습니다.', 'success');
+        }
+
+        // Add person
+        function addPerson() {
+            const name = document.getElementById('newPersonName').value.trim();
+            if (!name) {
+                showMessage('이름을 입력해주세요.', 'error');
+                return;
+            }
+
+            const unavailableDays = Array.from(document.querySelectorAll('.new-unavailable-day:checked'))
+                .map(cb => cb.value);
+            const alternativeDays = Array.from(document.querySelectorAll('.new-alternative-day:checked'))
+                .map(cb => cb.value);
+            const maxDuties = parseInt(document.getElementById('newPersonMaxDuties').value) || 5;
+            const secondDutyPref = document.getElementById('newPersonSecondDutyPref').value;
+
+            people.push(new Person(name, unavailableDays, alternativeDays, maxDuties, secondDutyPref));
+
+            // Clear form
+            document.getElementById('newPersonName').value = '';
+            document.querySelectorAll('.new-unavailable-day').forEach(cb => cb.checked = false);
+            document.querySelectorAll('.new-alternative-day').forEach(cb => cb.checked = false);
+            document.getElementById('newPersonMaxDuties').value = 5;
+            document.getElementById('newPersonSecondDutyPref').value = 'normal';
+
+            renderPersonList();
+            showMessage(`${name} 님이 추가되었습니다.`, 'success');
+        }
+
+        // Remove person
+        function removePerson(index) {
+            const person = people[index];
+            if (confirm(`${person.name} 님을 삭제하시겠습니까?`)) {
+                people.splice(index, 1);
+                renderPersonList();
+                showMessage('인원이 삭제되었습니다.', 'info');
+            }
+        }
+
+        // Clear all data
+        function clearAllData() {
+            if (confirm('모든 인원 데이터를 삭제하시겠습니까?')) {
+                people = [];
+                schedule = null;
+                renderPersonList();
+                document.getElementById('calendar').innerHTML = '';
+                document.getElementById('statistics').innerHTML = '';
+                showMessage('모든 데이터가 삭제되었습니다.', 'info');
+            }
+        }
+
+        // Render person list
+        function renderPersonList() {
+            const listDiv = document.getElementById('personList');
+            if (people.length === 0) {
+                listDiv.innerHTML = '<p class="small-text">등록된 인원이 없습니다. 위에서 인원을 추가하거나 예시 데이터를 불러오세요.</p>';
+                return;
+            }
+
+            let html = '<h3>등록된 인원 (' + people.length + '명)</h3>';
+            people.forEach((person, index) => {
+                let badge = '';
+                if (person.secondDutyPref === 'preferred') {
+                    badge = '<span class="preference-badge badge-2nd-preferred">2nd 선호</span>';
+                } else if (person.secondDutyPref === 'limited') {
+                    badge = '<span class="preference-badge badge-2nd-limited">2nd 1회만</span>';
+                }
+
+                html += `
+                    <div class="person-entry">
+                        <h3>${person.name}${badge}</h3>
+                        <p class="small-text">
+                            <strong>당직 불가:</strong> ${person.unavailableDays.join(', ') || '없음'}<br>
+                            <strong>2nd 가능:</strong> ${person.alternativeDays.join(', ') || '해당없음'}<br>
+                            <strong>최대 횟수:</strong> ${person.maxDuties}회
+                        </p>
+                        <button onclick="removePerson(${index})" class="danger" style="padding: 6px 12px; font-size: 14px;">삭제</button>
+                    </div>
+                `;
+            });
+            listDiv.innerHTML = html;
+        }
+
+        // Generate schedule
+        function generateSchedule() {
+            if (people.length === 0) {
+                showMessage('인원을 먼저 추가해주세요.', 'error');
+                return;
+            }
+
+            // Reset counts
+            people.forEach(p => {
+                p.primaryCount = 0;
+                p.secondaryCount = 0;
+            });
+
+            schedule = [];
+            const assignments = [];
+
+            // Try to generate schedule
+            let success = true;
+            let attempts = 0;
+            const maxAttempts = 100;
+
+            while (attempts < maxAttempts) {
+                attempts++;
+                schedule = [];
+                people.forEach(p => {
+                    p.primaryCount = 0;
+                    p.secondaryCount = 0;
+                });
+
+                success = true;
+
+                for (let day = 0; day < TOTAL_DAYS; day++) {
+                    const week = Math.floor(day / 5);
+                    const dayOfWeek = DAYS_OF_WEEK[day % 5];
+
+                    // Find primary duty
+                    const primaryCandidates = people.filter(p =>
+                        p.canDoPrimaryDuty(dayOfWeek) &&
+                        p.canTakeMoreDuties() &&
+                        !isConsecutive(schedule, p.name, day)
+                    ).sort((a, b) => a.primaryCount - b.primaryCount);
+
+                    if (primaryCandidates.length === 0) {
+                        success = false;
+                        break;
+                    }
+
+                    const primary = primaryCandidates[0];
+
+                    // Find secondary duty
+                    const secondaryCandidates = people.filter(p =>
+                        p !== primary &&
+                        p.canDoSecondaryDuty(dayOfWeek) &&
+                        (p.secondDutyPref === 'preferred' ||
+                         (p.secondDutyPref === 'limited' && p.secondaryCount < 1) ||
+                         (p.secondDutyPref === 'normal' && p.canTakeMoreDuties())) &&
+                        !isConsecutive(schedule, p.name, day)
+                    ).sort((a, b) => {
+                        // Prefer people who prefer 2nd duty
+                        if (a.secondDutyPref === 'preferred' && b.secondDutyPref !== 'preferred') return -1;
+                        if (b.secondDutyPref === 'preferred' && a.secondDutyPref !== 'preferred') return 1;
+                        return a.secondaryCount - b.secondaryCount;
+                    });
+
+                    if (secondaryCandidates.length === 0) {
+                        success = false;
+                        break;
+                    }
+
+                    const secondary = secondaryCandidates[0];
+
+                    schedule.push({
+                        day: day + 1,
+                        week: week + 1,
+                        dayOfWeek: dayOfWeek,
+                        primary: primary.name,
+                        secondary: secondary.name
+                    });
+
+                    primary.primaryCount++;
+                    secondary.secondaryCount++;
+                }
+
+                if (success) break;
+            }
+
+            if (!success) {
+                showMessage(`당직표 생성에 실패했습니다. 조건을 완화해주세요. (${attempts}번 시도)`, 'error');
+                return;
+            }
+
+            showMessage(`당직표가 성공적으로 생성되었습니다! (${attempts}번 시도)`, 'success');
+            renderCalendar();
+            renderStatistics();
+        }
+
+        // Check if assignment would be consecutive
+        function isConsecutive(schedule, personName, currentDay) {
+            if (currentDay === 0) return false;
+
+            const previousDay = schedule[currentDay - 1];
+            if (!previousDay) return false;
+
+            return previousDay.primary === personName || previousDay.secondary === personName;
+        }
+
+        // Render calendar
+        function renderCalendar() {
+            const calendarDiv = document.getElementById('calendar');
+            if (!schedule || schedule.length === 0) {
+                calendarDiv.innerHTML = '';
+                return;
+            }
+
+            let html = '<div class="calendar">';
+            schedule.forEach(day => {
+                html += `
+                    <div class="calendar-day week${day.week}">
+                        <div class="day-header">
+                            <span class="day-number">Day ${day.day}</span> ${day.dayOfWeek}요일
+                        </div>
+                        <div class="duty-assignment">
+                            <div class="duty-primary">🔴 ${day.primary}</div>
+                            <div class="duty-secondary">🔵 ${day.secondary}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            calendarDiv.innerHTML = html;
+        }
+
+        // Render statistics
+        function renderStatistics() {
+            const statsDiv = document.getElementById('statistics');
+            if (!schedule || schedule.length === 0) {
+                statsDiv.innerHTML = '';
+                return;
+            }
+
+            let html = '<div class="stats"><h3>📊 통계</h3><div class="stats-grid">';
+            people.forEach(person => {
+                const total = person.primaryCount + person.secondaryCount;
+                html += `
+                    <div class="stat-item">
+                        <strong>${person.name}</strong><br>
+                        <span class="small-text">
+                            당직: ${person.primaryCount}회 |
+                            2nd: ${person.secondaryCount}회 |
+                            총: ${total}회
+                        </span>
+                    </div>
+                `;
+            });
+            html += '</div></div>';
+            statsDiv.innerHTML = html;
+        }
+
+        // Show message
+        function showMessage(msg, type = 'info') {
+            const messagesDiv = document.getElementById('messages');
+            const alertClass = type === 'error' ? 'alert-error' :
+                              type === 'success' ? 'alert-success' : 'alert-info';
+            messagesDiv.innerHTML = `<div class="alert ${alertClass}">${msg}</div>`;
+            setTimeout(() => {
+                messagesDiv.innerHTML = '';
+            }, 5000);
+        }
+
+        // Export schedule
+        function exportSchedule() {
+            if (!schedule || schedule.length === 0) {
+                showMessage('먼저 당직표를 생성해주세요.', 'error');
+                return;
+            }
+
+            let text = '병원 당직표\n\n';
+            schedule.forEach(day => {
+                text += `Day ${day.day} (${day.dayOfWeek}): 당직 ${day.primary}, 2nd ${day.secondary}\n`;
+            });
+            text += '\n통계:\n';
+            people.forEach(person => {
+                text += `${person.name}: 당직 ${person.primaryCount}회, 2nd ${person.secondaryCount}회, 총 ${person.getTotalDuties()}회\n`;
+            });
+
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = '당직표_' + new Date().toISOString().slice(0, 10) + '.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+
+            showMessage('당직표가 다운로드되었습니다.', 'success');
+        }
+
+        // Initialize
+        renderPersonList();
+    </script>
+</body>
+</html>
