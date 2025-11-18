@@ -323,6 +323,57 @@ title: 병원 당직표 생성기
         .day-range-input input {
             width: 100%;
         }
+
+        .calendar-day.editable {
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .calendar-day.editable:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        .calendar-day.manually-edited {
+            border: 2px solid #f39c12;
+            position: relative;
+        }
+
+        .manual-edit-badge {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: #f39c12;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .edit-mode {
+            background: #fff9e6 !important;
+            border: 2px solid #3498db !important;
+        }
+
+        .edit-controls {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+        }
+
+        .edit-controls select {
+            width: 100%;
+            margin: 5px 0;
+            padding: 5px;
+            font-size: 13px;
+        }
+
+        .edit-controls button {
+            padding: 5px 10px;
+            font-size: 12px;
+            margin: 3px;
+        }
     </style>
 </head>
 <body>
@@ -386,6 +437,10 @@ title: 병원 당직표 생성기
             <div class="button-group">
                 <button onclick="generateSchedule()">🎯 당직표 생성</button>
                 <button onclick="exportSchedule()" class="secondary">💾 내보내기</button>
+            </div>
+
+            <div class="alert alert-info" style="font-size: 13px;">
+                💡 <strong>팁:</strong> 당직표 생성 후 각 날짜를 클릭하면 당직자를 수동으로 변경할 수 있습니다. 수동 편집된 날짜는 주황색 테두리로 표시됩니다.
             </div>
 
             <div id="messages"></div>
@@ -727,6 +782,9 @@ title: 병원 당직표 생성기
             return previousDay.primary === personName || previousDay.secondary === personName;
         }
 
+        // Current editing day
+        let editingDayIndex = null;
+
         // Render calendar
         function renderCalendar() {
             const calendarDiv = document.getElementById('calendar');
@@ -736,7 +794,7 @@ title: 병원 당직표 생성기
             }
 
             let html = '<div class="calendar">';
-            schedule.forEach(day => {
+            schedule.forEach((day, index) => {
                 // Check who is on vacation this day
                 const vacationers = people.filter(p => p.isOnVacation(day.day))
                     .map(p => p.name);
@@ -746,8 +804,37 @@ title: 병원 당직표 생성기
                     vacationHTML = `<div class="vacation-indicator">🏖️ ${vacationers.join(', ')}</div>`;
                 }
 
-                html += `
-                    <div class="calendar-day week${day.week}">
+                const isEditing = editingDayIndex === index;
+                const editableClass = 'editable';
+                const manuallyEditedClass = day.manuallyEdited ? 'manually-edited' : '';
+                const editModeClass = isEditing ? 'edit-mode' : '';
+                const manualBadge = day.manuallyEdited ? '<div class="manual-edit-badge">수정됨</div>' : '';
+
+                let contentHTML = '';
+                if (isEditing) {
+                    // Edit mode
+                    contentHTML = `
+                        <div class="day-header">
+                            <span class="day-number">Day ${day.day}</span> ${day.dayOfWeek}요일
+                        </div>
+                        <div class="edit-controls">
+                            <label style="font-size: 12px; margin: 0;">당직 (Primary)</label>
+                            <select id="editPrimary_${index}">
+                                ${people.map(p => `<option value="${p.name}" ${p.name === day.primary ? 'selected' : ''}>${p.name}</option>`).join('')}
+                            </select>
+                            <label style="font-size: 12px; margin: 0;">2nd Duty</label>
+                            <select id="editSecondary_${index}">
+                                ${people.map(p => `<option value="${p.name}" ${p.name === day.secondary ? 'selected' : ''}>${p.name}</option>`).join('')}
+                            </select>
+                            <div>
+                                <button onclick="saveEdit(${index})" style="background: #27ae60;">저장</button>
+                                <button onclick="cancelEdit()" class="secondary">취소</button>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    // Display mode
+                    contentHTML = `
                         <div class="day-header">
                             <span class="day-number">Day ${day.day}</span> ${day.dayOfWeek}요일
                         </div>
@@ -756,11 +843,83 @@ title: 병원 당직표 생성기
                             <div class="duty-secondary">🔵 ${day.secondary}</div>
                         </div>
                         ${vacationHTML}
+                    `;
+                }
+
+                html += `
+                    <div class="calendar-day week${day.week} ${editableClass} ${manuallyEditedClass} ${editModeClass}"
+                         onclick="${isEditing ? '' : `editDay(${index})`}">
+                        ${manualBadge}
+                        ${contentHTML}
                     </div>
                 `;
             });
             html += '</div>';
             calendarDiv.innerHTML = html;
+        }
+
+        // Edit day
+        function editDay(dayIndex) {
+            if (editingDayIndex !== null) {
+                cancelEdit();
+            }
+            editingDayIndex = dayIndex;
+            renderCalendar();
+        }
+
+        // Cancel edit
+        function cancelEdit() {
+            editingDayIndex = null;
+            renderCalendar();
+        }
+
+        // Save edit
+        function saveEdit(dayIndex) {
+            const primarySelect = document.getElementById(`editPrimary_${dayIndex}`);
+            const secondarySelect = document.getElementById(`editSecondary_${dayIndex}`);
+
+            const newPrimary = primarySelect.value;
+            const newSecondary = secondarySelect.value;
+
+            if (newPrimary === newSecondary) {
+                showMessage('당직과 2nd duty는 같은 사람일 수 없습니다.', 'error');
+                return;
+            }
+
+            const day = schedule[dayIndex];
+            const oldPrimary = day.primary;
+            const oldSecondary = day.secondary;
+
+            // Update schedule
+            day.primary = newPrimary;
+            day.secondary = newSecondary;
+            day.manuallyEdited = true;
+
+            // Recalculate counts
+            recalculateCounts();
+
+            editingDayIndex = null;
+            renderCalendar();
+            renderStatistics();
+            showMessage(`Day ${day.day} 당직이 변경되었습니다.`, 'success');
+        }
+
+        // Recalculate duty counts
+        function recalculateCounts() {
+            // Reset all counts
+            people.forEach(p => {
+                p.primaryCount = 0;
+                p.secondaryCount = 0;
+            });
+
+            // Count from schedule
+            schedule.forEach(day => {
+                const primaryPerson = people.find(p => p.name === day.primary);
+                const secondaryPerson = people.find(p => p.name === day.secondary);
+
+                if (primaryPerson) primaryPerson.primaryCount++;
+                if (secondaryPerson) secondaryPerson.secondaryCount++;
+            });
         }
 
         // Render statistics
@@ -813,7 +972,8 @@ title: 병원 당직표 생성기
             schedule.forEach(day => {
                 const vacationers = people.filter(p => p.isOnVacation(day.day)).map(p => p.name);
                 let vacInfo = vacationers.length > 0 ? ` (휴가: ${vacationers.join(', ')})` : '';
-                text += `Day ${day.day} (${day.dayOfWeek}): 당직 ${day.primary}, 2nd ${day.secondary}${vacInfo}\n`;
+                let editInfo = day.manuallyEdited ? ' [수동편집]' : '';
+                text += `Day ${day.day} (${day.dayOfWeek}): 당직 ${day.primary}, 2nd ${day.secondary}${vacInfo}${editInfo}\n`;
             });
 
             // Statistics
@@ -826,6 +986,15 @@ title: 병원 당직표 생성기
                 }
                 text += `${person.name}: 당직 ${person.primaryCount}회, 2nd ${person.secondaryCount}회, 총 ${person.getTotalDuties()}회${vacText}\n`;
             });
+
+            // Manual edits summary
+            const manualEdits = schedule.filter(d => d.manuallyEdited);
+            if (manualEdits.length > 0) {
+                text += '\n수동 편집된 날짜:\n';
+                manualEdits.forEach(day => {
+                    text += `- Day ${day.day} (${day.dayOfWeek})\n`;
+                });
+            }
 
             const blob = new Blob([text], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
