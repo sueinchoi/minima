@@ -459,13 +459,14 @@ title: 병원 당직표 생성기
 
         // Person class
         class Person {
-            constructor(name, unavailableDays, alternativeDays, maxDuties, secondDutyPref, vacations) {
+            constructor(name, unavailableDays, alternativeDays, maxDuties, secondDutyPref, vacations, weeklyRestrictions) {
                 this.name = name;
                 this.unavailableDays = unavailableDays || [];
                 this.alternativeDays = alternativeDays || [];
                 this.maxDuties = maxDuties || 5;
                 this.secondDutyPref = secondDutyPref || 'normal'; // 'normal', 'preferred', 'limited'
                 this.vacations = vacations || []; // Array of {start, end} objects
+                this.weeklyRestrictions = weeklyRestrictions || {}; // {weekNum: {unavailable: [], alternative: []}}
                 this.primaryCount = 0;
                 this.secondaryCount = 0;
             }
@@ -474,16 +475,40 @@ title: 병원 당직표 생성기
                 return this.vacations.some(v => dayNumber >= v.start && dayNumber <= v.end);
             }
 
-            canDoPrimaryDuty(dayOfWeek, dayNumber) {
+            canDoPrimaryDuty(dayOfWeek, dayNumber, weekNumber) {
                 if (this.isOnVacation(dayNumber)) return false;
-                return !this.unavailableDays.includes(dayOfWeek);
+
+                // Check general unavailable days (applies to all weeks)
+                if (this.unavailableDays.includes(dayOfWeek)) return false;
+
+                // Check week-specific restrictions
+                if (weekNumber && this.weeklyRestrictions[weekNumber]) {
+                    const weekRestriction = this.weeklyRestrictions[weekNumber];
+                    if (weekRestriction.unavailable && weekRestriction.unavailable.includes(dayOfWeek)) {
+                        return false;
+                    }
+                }
+
+                return true;
             }
 
-            canDoSecondaryDuty(dayOfWeek, dayNumber) {
+            canDoSecondaryDuty(dayOfWeek, dayNumber, weekNumber) {
                 if (this.isOnVacation(dayNumber)) return false;
+
+                // Check week-specific restrictions first
+                if (weekNumber && this.weeklyRestrictions[weekNumber]) {
+                    const weekRestriction = this.weeklyRestrictions[weekNumber];
+                    if (weekRestriction.unavailable && weekRestriction.unavailable.includes(dayOfWeek)) {
+                        // Check if this day is in alternative list for this week
+                        return weekRestriction.alternative && weekRestriction.alternative.includes(dayOfWeek);
+                    }
+                }
+
+                // Check general unavailable days
                 if (this.unavailableDays.includes(dayOfWeek)) {
                     return this.alternativeDays.includes(dayOfWeek);
                 }
+
                 return true;
             }
 
@@ -508,26 +533,42 @@ title: 병원 당직표 생성기
             removeVacation(index) {
                 this.vacations.splice(index, 1);
             }
+
+            addWeeklyRestriction(weekNum, unavailableDays, alternativeDays) {
+                this.weeklyRestrictions[weekNum] = {
+                    unavailable: unavailableDays || [],
+                    alternative: alternativeDays || []
+                };
+            }
+
+            removeWeeklyRestriction(weekNum) {
+                delete this.weeklyRestrictions[weekNum];
+            }
         }
 
         // Load sample data
         function loadSampleData() {
+            // Create person with weekly restriction example
+            const kimNayoung = new Person('김나영', ['화', '목', '금'], [], 3, 'normal', [], {});
+            kimNayoung.addWeeklyRestriction(1, ['월', '수'], []);  // 1주차: 월, 수 불가
+            kimNayoung.addWeeklyRestriction(2, ['목', '금'], ['목']);  // 2주차: 목, 금 불가 (목요일은 2nd 가능)
+
             people = [
-                new Person('김나영', ['화', '목', '금'], [], 3, 'normal', []),
-                new Person('이현규', [], [], 20, 'preferred', []),
-                new Person('이정수', ['수', '목'], ['수'], 5, 'normal', []),
-                new Person('유영철', ['수', '목', '금'], [], 3, 'normal', []),
-                new Person('서지우', ['월', '화'], ['월'], 5, 'normal', []),
-                new Person('이민정', ['화', '수'], ['화'], 5, 'normal', []),
-                new Person('공희정', ['월', '화'], ['월'], 5, 'normal', []),
-                new Person('문지애', ['목', '금'], ['목'], 5, 'normal', []),
-                new Person('전병남', ['수', '목'], ['수'], 5, 'normal', []),
-                new Person('노현정', ['화', '수'], ['화'], 5, 'normal', []),
-                new Person('백지원', [], [], 5, 'limited', []),
-                new Person('박수정', ['금', '월'], ['금'], 5, 'normal', [{start: 5, end: 12}])
+                kimNayoung,
+                new Person('이현규', [], [], 20, 'preferred', [], {}),
+                new Person('이정수', ['수', '목'], ['수'], 5, 'normal', [], {}),
+                new Person('유영철', ['수', '목', '금'], [], 3, 'normal', [], {}),
+                new Person('서지우', ['월', '화'], ['월'], 5, 'normal', [], {}),
+                new Person('이민정', ['화', '수'], ['화'], 5, 'normal', [], {}),
+                new Person('공희정', ['월', '화'], ['월'], 5, 'normal', [], {}),
+                new Person('문지애', ['목', '금'], ['목'], 5, 'normal', [], {}),
+                new Person('전병남', ['수', '목'], ['수'], 5, 'normal', [], {}),
+                new Person('노현정', ['화', '수'], ['화'], 5, 'normal', [], {}),
+                new Person('백지원', [], [], 5, 'limited', [], {}),
+                new Person('박수정', ['금', '월'], ['금'], 5, 'normal', [{start: 5, end: 12}], {})
             ];
             renderPersonList();
-            showMessage('예시 데이터가 로드되었습니다. (박수정: Day 5-12 휴가)', 'success');
+            showMessage('예시 데이터가 로드되었습니다. (김나영: 1주차 월/수, 2주차 목/금 불가)', 'success');
         }
 
         // Add person
@@ -611,15 +652,71 @@ title: 병원 당직표 생성기
                     vacationHTML += '</div>';
                 }
 
+                // Weekly restrictions display and form
+                let weeklyHTML = '';
+                if (person.weeklyRestrictions && Object.keys(person.weeklyRestrictions).length > 0) {
+                    weeklyHTML = '<div class="vacation-list" style="margin-top: 10px;">';
+                    Object.keys(person.weeklyRestrictions).sort().forEach(weekNum => {
+                        const restriction = person.weeklyRestrictions[weekNum];
+                        const unavailText = restriction.unavailable && restriction.unavailable.length > 0
+                            ? restriction.unavailable.join(', ') : '없음';
+                        const altText = restriction.alternative && restriction.alternative.length > 0
+                            ? `, 2nd 가능: ${restriction.alternative.join(', ')}` : '';
+                        weeklyHTML += `
+                            <div class="vacation-item">
+                                <span>📅 ${weekNum}주차: ${unavailText}${altText}</span>
+                                <button onclick="removeWeeklyRestriction(${index}, ${weekNum})" class="danger" style="padding: 3px 8px; font-size: 12px;">삭제</button>
+                            </div>
+                        `;
+                    });
+                    weeklyHTML += '</div>';
+                }
+
                 html += `
                     <div class="person-entry">
                         <h3>${person.name}${badge}</h3>
                         <p class="small-text">
-                            <strong>당직 불가:</strong> ${person.unavailableDays.join(', ') || '없음'}<br>
-                            <strong>2nd 가능:</strong> ${person.alternativeDays.join(', ') || '해당없음'}<br>
+                            <strong>당직 불가 (전체):</strong> ${person.unavailableDays.join(', ') || '없음'}<br>
+                            <strong>2nd 가능 (전체):</strong> ${person.alternativeDays.join(', ') || '해당없음'}<br>
                             <strong>최대 횟수:</strong> ${person.maxDuties}회
                         </p>
+                        ${weeklyHTML}
                         ${vacationHTML}
+
+                        <div class="vacation-form" style="background: #e8f4f8;">
+                            <label style="font-size: 13px; margin-bottom: 5px;">주별 제약 추가</label>
+                            <div style="display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start;">
+                                <div>
+                                    <label style="font-size: 12px;">주차</label>
+                                    <select id="weekNum_${index}" style="width: 60px; padding: 5px; font-size: 13px;">
+                                        <option value="1">1주</option>
+                                        <option value="2">2주</option>
+                                        <option value="3">3주</option>
+                                        <option value="4">4주</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="font-size: 12px;">불가능한 요일</label>
+                                    <div class="checkbox-group" style="margin-bottom: 5px;">
+                                        <label><input type="checkbox" value="월" class="week-unavailable-${index}"> 월</label>
+                                        <label><input type="checkbox" value="화" class="week-unavailable-${index}"> 화</label>
+                                        <label><input type="checkbox" value="수" class="week-unavailable-${index}"> 수</label>
+                                        <label><input type="checkbox" value="목" class="week-unavailable-${index}"> 목</label>
+                                        <label><input type="checkbox" value="금" class="week-unavailable-${index}"> 금</label>
+                                    </div>
+                                    <label style="font-size: 12px;">2nd duty 가능</label>
+                                    <div class="checkbox-group">
+                                        <label><input type="checkbox" value="월" class="week-alternative-${index}"> 월</label>
+                                        <label><input type="checkbox" value="화" class="week-alternative-${index}"> 화</label>
+                                        <label><input type="checkbox" value="수" class="week-alternative-${index}"> 수</label>
+                                        <label><input type="checkbox" value="목" class="week-alternative-${index}"> 목</label>
+                                        <label><input type="checkbox" value="금" class="week-alternative-${index}"> 금</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <button onclick="addWeeklyRestriction(${index})" style="padding: 6px 12px; font-size: 13px; margin-top: 5px;">주별 제약 추가</button>
+                        </div>
+
                         <div class="vacation-form">
                             <label style="font-size: 13px; margin-bottom: 5px;">휴가 추가</label>
                             <div class="day-range-input">
@@ -634,6 +731,34 @@ title: 병원 당직표 생성기
                 `;
             });
             listDiv.innerHTML = html;
+        }
+
+        // Add weekly restriction
+        function addWeeklyRestriction(personIndex) {
+            const weekNum = parseInt(document.getElementById(`weekNum_${personIndex}`).value);
+            const unavailableDays = Array.from(document.querySelectorAll(`.week-unavailable-${personIndex}:checked`))
+                .map(cb => cb.value);
+            const alternativeDays = Array.from(document.querySelectorAll(`.week-alternative-${personIndex}:checked`))
+                .map(cb => cb.value);
+
+            if (unavailableDays.length === 0) {
+                showMessage('불가능한 요일을 최소 1개 이상 선택해주세요.', 'error');
+                return;
+            }
+
+            people[personIndex].addWeeklyRestriction(weekNum, unavailableDays, alternativeDays);
+            renderPersonList();
+            showMessage(`${people[personIndex].name}의 ${weekNum}주차 제약이 추가되었습니다.`, 'success');
+        }
+
+        // Remove weekly restriction
+        function removeWeeklyRestriction(personIndex, weekNum) {
+            const person = people[personIndex];
+            if (confirm(`${person.name}의 ${weekNum}주차 제약을 삭제하시겠습니까?`)) {
+                person.removeWeeklyRestriction(weekNum);
+                renderPersonList();
+                showMessage('주별 제약이 삭제되었습니다.', 'info');
+            }
         }
 
         // Add vacation
@@ -708,12 +833,13 @@ title: 병원 당직표 생성기
 
                 for (let day = 0; day < TOTAL_DAYS; day++) {
                     const week = Math.floor(day / 5);
+                    const weekNumber = week + 1;
                     const dayOfWeek = DAYS_OF_WEEK[day % 5];
                     const dayNumber = day + 1;
 
                     // Find primary duty
                     const primaryCandidates = people.filter(p =>
-                        p.canDoPrimaryDuty(dayOfWeek, dayNumber) &&
+                        p.canDoPrimaryDuty(dayOfWeek, dayNumber, weekNumber) &&
                         p.canTakeMoreDuties() &&
                         !isConsecutive(schedule, p.name, day)
                     ).sort((a, b) => a.primaryCount - b.primaryCount);
@@ -728,7 +854,7 @@ title: 병원 당직표 생성기
                     // Find secondary duty
                     const secondaryCandidates = people.filter(p =>
                         p !== primary &&
-                        p.canDoSecondaryDuty(dayOfWeek, dayNumber) &&
+                        p.canDoSecondaryDuty(dayOfWeek, dayNumber, weekNumber) &&
                         (p.secondDutyPref === 'preferred' ||
                          (p.secondDutyPref === 'limited' && p.secondaryCount < 1) ||
                          (p.secondDutyPref === 'normal' && p.canTakeMoreDuties())) &&
@@ -749,7 +875,7 @@ title: 병원 당직표 생성기
 
                     schedule.push({
                         day: dayNumber,
-                        week: week + 1,
+                        week: weekNumber,
                         dayOfWeek: dayOfWeek,
                         primary: primary.name,
                         secondary: secondary.name
@@ -984,7 +1110,19 @@ title: 병원 당직표 생성기
                     const vacList = person.vacations.map(v => `Day ${v.start}-${v.end}`).join(', ');
                     vacText = ` (휴가: ${vacList})`;
                 }
-                text += `${person.name}: 당직 ${person.primaryCount}회, 2nd ${person.secondaryCount}회, 총 ${person.getTotalDuties()}회${vacText}\n`;
+
+                let weeklyText = '';
+                if (person.weeklyRestrictions && Object.keys(person.weeklyRestrictions).length > 0) {
+                    const weeklyList = Object.keys(person.weeklyRestrictions).sort().map(weekNum => {
+                        const r = person.weeklyRestrictions[weekNum];
+                        const unavail = r.unavailable && r.unavailable.length > 0 ? r.unavailable.join(',') : '';
+                        const alt = r.alternative && r.alternative.length > 0 ? `(2nd:${r.alternative.join(',')})` : '';
+                        return `${weekNum}주:${unavail}${alt}`;
+                    }).join(', ');
+                    weeklyText = ` (주별제약: ${weeklyList})`;
+                }
+
+                text += `${person.name}: 당직 ${person.primaryCount}회, 2nd ${person.secondaryCount}회, 총 ${person.getTotalDuties()}회${vacText}${weeklyText}\n`;
             });
 
             // Manual edits summary
