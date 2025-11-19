@@ -1007,7 +1007,14 @@ title: 병원 당직표 생성기
                         p.canDoPrimaryDuty(dayOfWeek, dayNumber, weekNumber) &&
                         p.canTakeMoreDuties() &&
                         !isConsecutive(schedule, p.name, day)
-                    ).sort((a, b) => a.primaryCount - b.primaryCount);
+                    ).sort((a, b) => {
+                        // If same maxDuties, balance total duties within the group
+                        if (a.maxDuties === b.maxDuties) {
+                            return a.getTotalDuties() - b.getTotalDuties();
+                        }
+                        // Otherwise compare by primary count
+                        return a.primaryCount - b.primaryCount;
+                    });
 
                     if (primaryCandidates.length === 0) {
                         success = false;
@@ -1031,6 +1038,11 @@ title: 병원 당직표 생성기
                         if (b.secondDutyPref === 'preferred' && a.secondDutyPref !== 'preferred') return 1;
                         if (a.secondDutyPref === '2nd-only' && b.secondDutyPref !== '2nd-only' && b.secondDutyPref !== 'preferred') return -1;
                         if (b.secondDutyPref === '2nd-only' && a.secondDutyPref !== '2nd-only' && a.secondDutyPref !== 'preferred') return 1;
+
+                        // If same maxDuties, balance total duties within the group
+                        if (a.maxDuties === b.maxDuties) {
+                            return a.getTotalDuties() - b.getTotalDuties();
+                        }
                         return a.secondaryCount - b.secondaryCount;
                     });
 
@@ -1106,16 +1118,26 @@ title: 병원 당직표 생성기
                         p.canDoPrimaryDuty(dayOfWeek, dayNumber, weekNumber) &&
                         p.canTakeMoreDuties() &&
                         !isConsecutive(tempSchedule, p.name, day)
-                    ).sort((a, b) => a.primaryCount - b.primaryCount);
+                    ).sort((a, b) => {
+                        // If same maxDuties, balance total duties within the group
+                        if (a.maxDuties === b.maxDuties) {
+                            return a.getTotalDuties() - b.getTotalDuties();
+                        }
+                        // Otherwise compare by primary count
+                        return a.primaryCount - b.primaryCount;
+                    });
 
                     if (primaryCandidates.length === 0) {
                         success = false;
                         break;
                     }
 
-                    // Randomly select from candidates with lowest count
-                    const minCount = primaryCandidates[0].primaryCount;
-                    const bestCandidates = primaryCandidates.filter(p => p.primaryCount === minCount);
+                    // Randomly select from candidates with lowest total duties in same maxDuties group
+                    const firstCandidate = primaryCandidates[0];
+                    const bestCandidates = primaryCandidates.filter(p =>
+                        p.maxDuties === firstCandidate.maxDuties &&
+                        p.getTotalDuties() === firstCandidate.getTotalDuties()
+                    );
                     const primary = bestCandidates[Math.floor(Math.random() * bestCandidates.length)];
 
                     // Find secondary duty with randomization
@@ -1133,6 +1155,11 @@ title: 병원 당직표 생성기
                         if (b.secondDutyPref === 'preferred' && a.secondDutyPref !== 'preferred') return 1;
                         if (a.secondDutyPref === '2nd-only' && b.secondDutyPref !== '2nd-only' && b.secondDutyPref !== 'preferred') return -1;
                         if (b.secondDutyPref === '2nd-only' && a.secondDutyPref !== '2nd-only' && a.secondDutyPref !== 'preferred') return 1;
+
+                        // If same maxDuties, balance total duties within the group
+                        if (a.maxDuties === b.maxDuties) {
+                            return a.getTotalDuties() - b.getTotalDuties();
+                        }
                         return a.secondaryCount - b.secondaryCount;
                     });
 
