@@ -1844,48 +1844,62 @@ title: 병원 당직표 생성기
             const target = e.target;
 
             // Remove vacation button
-            if (target.classList.contains('btn-remove-vacation')) {
-                const personIndex = parseInt(target.getAttribute('data-person-index'));
-                const vacationIndex = parseInt(target.getAttribute('data-vacation-index'));
+            let btn = target.closest('.btn-remove-vacation');
+            if (btn) {
+                const personIndex = parseInt(btn.getAttribute('data-person-index'));
+                const vacationIndex = parseInt(btn.getAttribute('data-vacation-index'));
                 removeVacation(personIndex, vacationIndex);
+                return;
             }
 
             // Remove weekly restriction button
-            if (target.classList.contains('btn-remove-weekly')) {
-                const personIndex = parseInt(target.getAttribute('data-person-index'));
-                const weekNum = target.getAttribute('data-week-num');
+            btn = target.closest('.btn-remove-weekly');
+            if (btn) {
+                const personIndex = parseInt(btn.getAttribute('data-person-index'));
+                const weekNum = btn.getAttribute('data-week-num');
                 removeWeeklyRestriction(personIndex, weekNum);
+                return;
             }
 
             // Remove person button
-            if (target.classList.contains('btn-remove-person')) {
-                const personIndex = parseInt(target.getAttribute('data-person-index'));
+            btn = target.closest('.btn-remove-person');
+            if (btn) {
+                const personIndex = parseInt(btn.getAttribute('data-person-index'));
                 removePerson(personIndex);
+                return;
             }
 
             // Add vacation button
-            if (target.classList.contains('btn-add-vacation')) {
-                const personIndex = parseInt(target.getAttribute('data-person-index'));
+            btn = target.closest('.btn-add-vacation');
+            if (btn) {
+                const personIndex = parseInt(btn.getAttribute('data-person-index'));
                 addVacation(personIndex);
+                return;
             }
 
             // Add weekly restriction button
-            if (target.classList.contains('btn-add-weekly')) {
-                const personIndex = parseInt(target.getAttribute('data-person-index'));
+            btn = target.closest('.btn-add-weekly');
+            if (btn) {
+                const personIndex = parseInt(btn.getAttribute('data-person-index'));
                 addWeeklyRestriction(personIndex);
+                return;
             }
 
             // Add preferred duty button
-            if (target.classList.contains('btn-add-preferred')) {
-                const personIndex = parseInt(target.getAttribute('data-person-index'));
+            btn = target.closest('.btn-add-preferred');
+            if (btn) {
+                const personIndex = parseInt(btn.getAttribute('data-person-index'));
                 addPreferredDuty(personIndex);
+                return;
             }
 
             // Remove preferred duty button
-            if (target.classList.contains('btn-remove-preferred')) {
-                const personIndex = parseInt(target.getAttribute('data-person-index'));
-                const preferredIndex = parseInt(target.getAttribute('data-preferred-index'));
+            btn = target.closest('.btn-remove-preferred');
+            if (btn) {
+                const personIndex = parseInt(btn.getAttribute('data-person-index'));
+                const preferredIndex = parseInt(btn.getAttribute('data-preferred-index'));
                 removePreferredDuty(personIndex, preferredIndex);
+                return;
             }
         });
     </script>
