@@ -762,11 +762,21 @@ title: 병원 당직표 생성기
 
         // Remove weekly restriction
         function removeWeeklyRestriction(personIndex, weekNum) {
+            if (personIndex === undefined || weekNum === undefined) {
+                showMessage('삭제 오류: 잘못된 인덱스입니다.', 'error');
+                return;
+            }
+
             const person = people[personIndex];
+            if (!person) {
+                showMessage('삭제 오류: 인원을 찾을 수 없습니다.', 'error');
+                return;
+            }
+
             if (confirm(`${person.name}의 ${weekNum}주차 제약을 삭제하시겠습니까?`)) {
-                person.removeWeeklyRestriction(weekNum);
+                delete person.weeklyRestrictions[weekNum];
                 renderPersonList();
-                showMessage('주별 제약이 삭제되었습니다.', 'info');
+                showMessage('주별 제약이 삭제되었습니다.', 'success');
             }
         }
 
@@ -800,12 +810,27 @@ title: 병원 당직표 생성기
 
         // Remove vacation
         function removeVacation(personIndex, vacationIndex) {
+            if (personIndex === undefined || vacationIndex === undefined) {
+                showMessage('삭제 오류: 잘못된 인덱스입니다.', 'error');
+                return;
+            }
+
             const person = people[personIndex];
+            if (!person) {
+                showMessage('삭제 오류: 인원을 찾을 수 없습니다.', 'error');
+                return;
+            }
+
             const vacation = person.vacations[vacationIndex];
+            if (!vacation) {
+                showMessage('삭제 오류: 휴가를 찾을 수 없습니다.', 'error');
+                return;
+            }
+
             if (confirm(`${person.name}의 휴가 (Day ${vacation.start} ~ ${vacation.end})를 삭제하시겠습니까?`)) {
-                person.removeVacation(vacationIndex);
+                person.vacations.splice(vacationIndex, 1);
                 renderPersonList();
-                showMessage('휴가가 삭제되었습니다.', 'info');
+                showMessage('휴가가 삭제되었습니다.', 'success');
             }
         }
 
