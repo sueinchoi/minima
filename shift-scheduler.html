@@ -1218,8 +1218,19 @@ title: 병원 당직표 생성기
                         !isConsecutive(schedule, p.name, day)
                     );
 
+                    // Debug logging
+                    const allPreferred = people.filter(p => p.hasPreferredDuty(dayNumber, 'primary'));
+                    if (allPreferred.length > 0) {
+                        console.log(`Day ${dayNumber}: Found ${allPreferred.length} people with preferred primary duty:`, allPreferred.map(p => p.name));
+                        console.log(`After filters: ${preferredPrimaryPeople.length} people:`, preferredPrimaryPeople.map(p => p.name));
+                        allPreferred.forEach(p => {
+                            console.log(`  ${p.name}: canDoPrimaryDuty=${p.canDoPrimaryDuty(dayOfWeek, dayNumber, weekNumber)}, canTakeMoreDuties=${p.canTakeMoreDuties()}, isConsecutive=${isConsecutive(schedule, p.name, day)}`);
+                        });
+                    }
+
                     if (preferredPrimaryPeople.length > 0) {
                         primary = preferredPrimaryPeople[0];
+                        console.log(`✅ Day ${dayNumber}: Assigned preferred primary duty to ${primary.name}`);
                     } else {
                         const primaryCandidates = people.filter(p =>
                             p.canDoPrimaryDuty(dayOfWeek, dayNumber, weekNumber) &&
@@ -1260,8 +1271,16 @@ title: 병원 당직표 생성기
                         !isConsecutive(schedule, p.name, day)
                     );
 
+                    // Debug logging
+                    const allPreferredSecondary = people.filter(p => p.hasPreferredDuty(dayNumber, 'secondary'));
+                    if (allPreferredSecondary.length > 0) {
+                        console.log(`Day ${dayNumber}: Found ${allPreferredSecondary.length} people with preferred secondary duty:`, allPreferredSecondary.map(p => p.name));
+                        console.log(`After filters: ${preferredSecondaryPeople.length} people:`, preferredSecondaryPeople.map(p => p.name));
+                    }
+
                     if (preferredSecondaryPeople.length > 0) {
                         secondary = preferredSecondaryPeople[0];
+                        console.log(`✅ Day ${dayNumber}: Assigned preferred secondary duty to ${secondary.name}`);
                     } else {
                         const secondaryCandidates = people.filter(p =>
                             p !== primary &&
