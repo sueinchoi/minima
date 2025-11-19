@@ -415,6 +415,7 @@ title: 병원 당직표 생성기
                     <option value="normal">일반</option>
                     <option value="preferred">선호 (무제한)</option>
                     <option value="limited">제한적 (1회만)</option>
+                    <option value="2nd-only">2nd duty만</option>
                 </select>
 
                 <div class="button-group">
@@ -476,6 +477,9 @@ title: 병원 당직표 생성기
             }
 
             canDoPrimaryDuty(dayOfWeek, dayNumber, weekNumber) {
+                // 2nd duty only staff cannot do primary duty
+                if (this.secondDutyPref === '2nd-only') return false;
+
                 if (this.isOnVacation(dayNumber)) return false;
 
                 // Check general unavailable days (applies to all weeks)
@@ -519,6 +523,9 @@ title: 병원 당직표 생성기
             canTakeMoreDuties() {
                 if (this.secondDutyPref === 'preferred') {
                     return true; // Unlimited for 2nd duty preferred
+                }
+                if (this.secondDutyPref === '2nd-only') {
+                    return this.secondaryCount < this.maxDuties; // Only 2nd duty counts for 2nd-only staff
                 }
                 if (this.secondDutyPref === 'limited' && this.secondaryCount >= 1) {
                     return this.primaryCount < this.maxDuties;
@@ -636,6 +643,8 @@ title: 병원 당직표 생성기
                     badge = '<span class="preference-badge badge-2nd-preferred">2nd 선호</span>';
                 } else if (person.secondDutyPref === 'limited') {
                     badge = '<span class="preference-badge badge-2nd-limited">2nd 1회만</span>';
+                } else if (person.secondDutyPref === '2nd-only') {
+                    badge = '<span class="preference-badge badge-vacation">2nd만</span>';
                 }
 
                 let vacationHTML = '';
@@ -856,13 +865,16 @@ title: 병원 당직표 생성기
                         p !== primary &&
                         p.canDoSecondaryDuty(dayOfWeek, dayNumber, weekNumber) &&
                         (p.secondDutyPref === 'preferred' ||
+                         (p.secondDutyPref === '2nd-only' && p.canTakeMoreDuties()) ||
                          (p.secondDutyPref === 'limited' && p.secondaryCount < 1) ||
                          (p.secondDutyPref === 'normal' && p.canTakeMoreDuties())) &&
                         !isConsecutive(schedule, p.name, day)
                     ).sort((a, b) => {
-                        // Prefer people who prefer 2nd duty
+                        // Prefer people who prefer 2nd duty or are 2nd-only
                         if (a.secondDutyPref === 'preferred' && b.secondDutyPref !== 'preferred') return -1;
                         if (b.secondDutyPref === 'preferred' && a.secondDutyPref !== 'preferred') return 1;
+                        if (a.secondDutyPref === '2nd-only' && b.secondDutyPref !== '2nd-only' && b.secondDutyPref !== 'preferred') return -1;
+                        if (b.secondDutyPref === '2nd-only' && a.secondDutyPref !== '2nd-only' && a.secondDutyPref !== 'preferred') return 1;
                         return a.secondaryCount - b.secondaryCount;
                     });
 
