@@ -1211,21 +1211,15 @@ title: 병원 당직표 생성기
 
                     // Find primary duty - check for preferred duty first
                     let primary = null;
+                    // For preferred duty, only check if person is not on vacation (ignore all other constraints)
                     const preferredPrimaryPeople = people.filter(p =>
                         p.hasPreferredDuty(dayNumber, 'primary') &&
-                        p.canDoPrimaryDuty(dayOfWeek, dayNumber, weekNumber) &&
-                        p.canTakeMoreDuties() &&
-                        !isConsecutive(schedule, p.name, day)
+                        !p.isOnVacation(dayNumber)
                     );
 
                     // Debug logging
-                    const allPreferred = people.filter(p => p.hasPreferredDuty(dayNumber, 'primary'));
-                    if (allPreferred.length > 0) {
-                        console.log(`Day ${dayNumber}: Found ${allPreferred.length} people with preferred primary duty:`, allPreferred.map(p => p.name));
-                        console.log(`After filters: ${preferredPrimaryPeople.length} people:`, preferredPrimaryPeople.map(p => p.name));
-                        allPreferred.forEach(p => {
-                            console.log(`  ${p.name}: canDoPrimaryDuty=${p.canDoPrimaryDuty(dayOfWeek, dayNumber, weekNumber)}, canTakeMoreDuties=${p.canTakeMoreDuties()}, isConsecutive=${isConsecutive(schedule, p.name, day)}`);
-                        });
+                    if (preferredPrimaryPeople.length > 0) {
+                        console.log(`✅ Day ${dayNumber}: Found ${preferredPrimaryPeople.length} people with preferred primary duty:`, preferredPrimaryPeople.map(p => p.name), '(constraints bypassed)');
                     }
 
                     if (preferredPrimaryPeople.length > 0) {
@@ -1260,22 +1254,16 @@ title: 병원 당직표 생성기
 
                     // Find secondary duty - check for preferred duty first
                     let secondary = null;
+                    // For preferred duty, only check if person is not on vacation and not already primary (ignore all other constraints)
                     const preferredSecondaryPeople = people.filter(p =>
                         p !== primary &&
                         p.hasPreferredDuty(dayNumber, 'secondary') &&
-                        p.canDoSecondaryDuty(dayOfWeek, dayNumber, weekNumber) &&
-                        (p.secondDutyPref === 'preferred' ||
-                         (p.secondDutyPref === '2nd-only' && p.canTakeMoreDuties()) ||
-                         (p.secondDutyPref === 'limited' && p.secondaryCount < 1) ||
-                         (p.secondDutyPref === 'normal' && p.canTakeMoreDuties())) &&
-                        !isConsecutive(schedule, p.name, day)
+                        !p.isOnVacation(dayNumber)
                     );
 
                     // Debug logging
-                    const allPreferredSecondary = people.filter(p => p.hasPreferredDuty(dayNumber, 'secondary'));
-                    if (allPreferredSecondary.length > 0) {
-                        console.log(`Day ${dayNumber}: Found ${allPreferredSecondary.length} people with preferred secondary duty:`, allPreferredSecondary.map(p => p.name));
-                        console.log(`After filters: ${preferredSecondaryPeople.length} people:`, preferredSecondaryPeople.map(p => p.name));
+                    if (preferredSecondaryPeople.length > 0) {
+                        console.log(`✅ Day ${dayNumber}: Found ${preferredSecondaryPeople.length} people with preferred secondary duty:`, preferredSecondaryPeople.map(p => p.name), '(constraints bypassed)');
                     }
 
                     if (preferredSecondaryPeople.length > 0) {
@@ -1379,11 +1367,10 @@ title: 병원 당직표 생성기
 
                     // Find primary duty - check for preferred duty first
                     let primary = null;
+                    // For preferred duty, only check if person is not on vacation (ignore all other constraints)
                     const preferredPrimaryPeople = people.filter(p =>
                         p.hasPreferredDuty(dayNumber, 'primary') &&
-                        p.canDoPrimaryDuty(dayOfWeek, dayNumber, weekNumber) &&
-                        p.canTakeMoreDuties() &&
-                        !isConsecutive(tempSchedule, p.name, day)
+                        !p.isOnVacation(dayNumber)
                     );
 
                     if (preferredPrimaryPeople.length > 0) {
@@ -1424,15 +1411,11 @@ title: 병원 당직표 생성기
 
                     // Find secondary duty - check for preferred duty first
                     let secondary = null;
+                    // For preferred duty, only check if person is not on vacation and not already primary (ignore all other constraints)
                     const preferredSecondaryPeople = people.filter(p =>
                         p !== primary &&
                         p.hasPreferredDuty(dayNumber, 'secondary') &&
-                        p.canDoSecondaryDuty(dayOfWeek, dayNumber, weekNumber) &&
-                        (p.secondDutyPref === 'preferred' ||
-                         (p.secondDutyPref === '2nd-only' && p.canTakeMoreDuties()) ||
-                         (p.secondDutyPref === 'limited' && p.secondaryCount < 1) ||
-                         (p.secondDutyPref === 'normal' && p.canTakeMoreDuties())) &&
-                        !isConsecutive(tempSchedule, p.name, day)
+                        !p.isOnVacation(dayNumber)
                     );
 
                     if (preferredSecondaryPeople.length > 0) {
