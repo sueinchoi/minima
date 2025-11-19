@@ -536,7 +536,14 @@ title: 병원 당직표 생성기
 
             <div class="button-group">
                 <button onclick="generateSchedule()">🎯 당직표 생성</button>
+                <button onclick="generateMultipleSchedules()">🔄 여러 경우 생성 (5개)</button>
                 <button onclick="exportSchedule()" class="secondary">💾 내보내기</button>
+            </div>
+
+            <div id="scheduleNavigation" style="display: none; text-align: center; margin: 15px 0; padding: 10px; background: #f0f8ff; border-radius: 5px;">
+                <button onclick="previousSchedule()" class="secondary">◀ 이전</button>
+                <span id="scheduleInfo" style="margin: 0 20px; font-weight: 600; color: #2c3e50;">1 / 1</span>
+                <button onclick="nextSchedule()" class="secondary">다음 ▶</button>
             </div>
 
             <div class="alert alert-info" style="font-size: 13px;">
@@ -553,6 +560,8 @@ title: 병원 당직표 생성기
         // Global data
         let people = [];
         let schedule = null;
+        let schedules = []; // Multiple schedules storage
+        let currentScheduleIndex = 0; // Current schedule being viewed
         const DAYS_OF_WEEK = ['월', '화', '수', '목', '금'];
         const TOTAL_DAYS = 20;
         const WEEKS = 4;
@@ -1053,8 +1062,160 @@ title: 병원 당직표 생성기
             }
 
             showMessage(`당직표가 성공적으로 생성되었습니다! (${attempts}번 시도)`, 'success');
+            schedules = [schedule];
+            currentScheduleIndex = 0;
+            document.getElementById('scheduleNavigation').style.display = 'none';
             renderCalendar();
             renderStatistics();
+        }
+
+        // Generate multiple schedules
+        function generateMultipleSchedules() {
+            if (people.length === 0) {
+                showMessage('인원을 먼저 추가해주세요.', 'error');
+                return;
+            }
+
+            const targetCount = 5;
+            schedules = [];
+            const maxTotalAttempts = 500;
+            let totalAttempts = 0;
+
+            showMessage('여러 경우의 당직표를 생성 중입니다...', 'info');
+
+            while (schedules.length < targetCount && totalAttempts < maxTotalAttempts) {
+                totalAttempts++;
+
+                // Reset counts
+                people.forEach(p => {
+                    p.primaryCount = 0;
+                    p.secondaryCount = 0;
+                });
+
+                let tempSchedule = [];
+                let success = true;
+
+                for (let day = 0; day < TOTAL_DAYS; day++) {
+                    const week = Math.floor(day / 5);
+                    const weekNumber = week + 1;
+                    const dayOfWeek = DAYS_OF_WEEK[day % 5];
+                    const dayNumber = day + 1;
+
+                    // Find primary duty with randomization
+                    const primaryCandidates = people.filter(p =>
+                        p.canDoPrimaryDuty(dayOfWeek, dayNumber, weekNumber) &&
+                        p.canTakeMoreDuties() &&
+                        !isConsecutive(tempSchedule, p.name, day)
+                    ).sort((a, b) => a.primaryCount - b.primaryCount);
+
+                    if (primaryCandidates.length === 0) {
+                        success = false;
+                        break;
+                    }
+
+                    // Randomly select from candidates with lowest count
+                    const minCount = primaryCandidates[0].primaryCount;
+                    const bestCandidates = primaryCandidates.filter(p => p.primaryCount === minCount);
+                    const primary = bestCandidates[Math.floor(Math.random() * bestCandidates.length)];
+
+                    // Find secondary duty with randomization
+                    const secondaryCandidates = people.filter(p =>
+                        p !== primary &&
+                        p.canDoSecondaryDuty(dayOfWeek, dayNumber, weekNumber) &&
+                        (p.secondDutyPref === 'preferred' ||
+                         (p.secondDutyPref === '2nd-only' && p.canTakeMoreDuties()) ||
+                         (p.secondDutyPref === 'limited' && p.secondaryCount < 1) ||
+                         (p.secondDutyPref === 'normal' && p.canTakeMoreDuties())) &&
+                        !isConsecutive(tempSchedule, p.name, day)
+                    ).sort((a, b) => {
+                        // Prefer people who prefer 2nd duty or are 2nd-only
+                        if (a.secondDutyPref === 'preferred' && b.secondDutyPref !== 'preferred') return -1;
+                        if (b.secondDutyPref === 'preferred' && a.secondDutyPref !== 'preferred') return 1;
+                        if (a.secondDutyPref === '2nd-only' && b.secondDutyPref !== '2nd-only' && b.secondDutyPref !== 'preferred') return -1;
+                        if (b.secondDutyPref === '2nd-only' && a.secondDutyPref !== '2nd-only' && a.secondDutyPref !== 'preferred') return 1;
+                        return a.secondaryCount - b.secondaryCount;
+                    });
+
+                    if (secondaryCandidates.length === 0) {
+                        success = false;
+                        break;
+                    }
+
+                    // Randomly select from top candidates
+                    const topCandidates = secondaryCandidates.slice(0, Math.min(3, secondaryCandidates.length));
+                    const secondary = topCandidates[Math.floor(Math.random() * topCandidates.length)];
+
+                    tempSchedule.push({
+                        day: dayNumber,
+                        week: weekNumber,
+                        dayOfWeek: dayOfWeek,
+                        primary: primary.name,
+                        secondary: secondary.name
+                    });
+
+                    primary.primaryCount++;
+                    secondary.secondaryCount++;
+                }
+
+                if (success && !isDuplicateSchedule(tempSchedule, schedules)) {
+                    schedules.push(JSON.parse(JSON.stringify(tempSchedule)));
+                }
+            }
+
+            if (schedules.length === 0) {
+                showMessage('당직표 생성에 실패했습니다. 조건을 완화해주세요.', 'error');
+                return;
+            }
+
+            currentScheduleIndex = 0;
+            schedule = schedules[currentScheduleIndex];
+
+            // Recalculate counts for display
+            recalculateCounts();
+
+            showMessage(`${schedules.length}개의 다른 당직표가 생성되었습니다! (총 ${totalAttempts}번 시도)`, 'success');
+            document.getElementById('scheduleNavigation').style.display = 'block';
+            updateScheduleInfo();
+            renderCalendar();
+            renderStatistics();
+        }
+
+        // Check if schedule is duplicate
+        function isDuplicateSchedule(newSchedule, existingSchedules) {
+            return existingSchedules.some(existing => {
+                return existing.every((day, index) =>
+                    day.primary === newSchedule[index].primary &&
+                    day.secondary === newSchedule[index].secondary
+                );
+            });
+        }
+
+        // Navigate to previous schedule
+        function previousSchedule() {
+            if (schedules.length === 0) return;
+            currentScheduleIndex = (currentScheduleIndex - 1 + schedules.length) % schedules.length;
+            schedule = schedules[currentScheduleIndex];
+            recalculateCounts();
+            updateScheduleInfo();
+            renderCalendar();
+            renderStatistics();
+        }
+
+        // Navigate to next schedule
+        function nextSchedule() {
+            if (schedules.length === 0) return;
+            currentScheduleIndex = (currentScheduleIndex + 1) % schedules.length;
+            schedule = schedules[currentScheduleIndex];
+            recalculateCounts();
+            updateScheduleInfo();
+            renderCalendar();
+            renderStatistics();
+        }
+
+        // Update schedule navigation info
+        function updateScheduleInfo() {
+            const info = document.getElementById('scheduleInfo');
+            info.textContent = `${currentScheduleIndex + 1} / ${schedules.length}`;
         }
 
         // Check if assignment would be consecutive
