@@ -568,7 +568,7 @@ title: 병원 당직표 생성기
 
         // Person class
         class Person {
-            constructor(name, unavailableDays, alternativeDays, maxDuties, secondDutyPref, vacations, weeklyRestrictions) {
+            constructor(name, unavailableDays, alternativeDays, maxDuties, secondDutyPref, vacations, weeklyRestrictions, preferredDutyDays) {
                 this.name = name;
                 this.unavailableDays = unavailableDays || [];
                 this.alternativeDays = alternativeDays || [];
@@ -576,12 +576,27 @@ title: 병원 당직표 생성기
                 this.secondDutyPref = secondDutyPref || 'normal'; // 'normal', 'preferred', 'limited'
                 this.vacations = vacations || []; // Array of {start, end} objects
                 this.weeklyRestrictions = weeklyRestrictions || {}; // {weekNum: {unavailable: [], alternative: []}}
+                this.preferredDutyDays = preferredDutyDays || []; // Array of {day: number, type: 'primary' | 'secondary' | 'any'}
                 this.primaryCount = 0;
                 this.secondaryCount = 0;
             }
 
             isOnVacation(dayNumber) {
                 return this.vacations.some(v => dayNumber >= v.start && dayNumber <= v.end);
+            }
+
+            hasPreferredDuty(dayNumber, type) {
+                return this.preferredDutyDays.some(p =>
+                    p.day === dayNumber && (type === 'any' || p.type === type || p.type === 'any')
+                );
+            }
+
+            addPreferredDuty(day, type) {
+                this.preferredDutyDays.push({ day, type });
+            }
+
+            removePreferredDuty(index) {
+                this.preferredDutyDays.splice(index, 1);
             }
 
             canDoPrimaryDuty(dayOfWeek, dayNumber, weekNumber) {
@@ -664,23 +679,23 @@ title: 병원 당직표 생성기
         // Load sample data
         function loadSampleData() {
             // Create person with weekly restriction example
-            const kimNayoung = new Person('김나영', ['화', '목', '금'], [], 3, 'normal', [], {});
+            const kimNayoung = new Person('김나영', ['화', '목', '금'], [], 3, 'normal', [], {}, []);
             kimNayoung.addWeeklyRestriction(1, ['월', '수'], []);  // 1주차: 월, 수 불가
             kimNayoung.addWeeklyRestriction(2, ['목', '금'], ['목']);  // 2주차: 목, 금 불가 (목요일은 2nd 가능)
 
             people = [
                 kimNayoung,
-                new Person('이현규', [], [], 20, 'preferred', [], {}),
-                new Person('이정수', ['수', '목'], ['수'], 5, 'normal', [], {}),
-                new Person('유영철', ['수', '목', '금'], [], 3, 'normal', [], {}),
-                new Person('서지우', ['월', '화'], ['월'], 5, 'normal', [], {}),
-                new Person('이민정', ['화', '수'], ['화'], 5, 'normal', [], {}),
-                new Person('공희정', ['월', '화'], ['월'], 5, 'normal', [], {}),
-                new Person('문지애', ['목', '금'], ['목'], 5, 'normal', [], {}),
-                new Person('전병남', ['수', '목'], ['수'], 5, 'normal', [], {}),
-                new Person('노현정', ['화', '수'], ['화'], 5, 'normal', [], {}),
-                new Person('백지원', [], [], 5, 'limited', [], {}),
-                new Person('박수정', ['금', '월'], ['금'], 5, 'normal', [{start: 5, end: 12}], {})
+                new Person('이현규', [], [], 20, 'preferred', [], {}, []),
+                new Person('이정수', ['수', '목'], ['수'], 5, 'normal', [], {}, []),
+                new Person('유영철', ['수', '목', '금'], [], 3, 'normal', [], {}, []),
+                new Person('서지우', ['월', '화'], ['월'], 5, 'normal', [], {}, []),
+                new Person('이민정', ['화', '수'], ['화'], 5, 'normal', [], {}, []),
+                new Person('공희정', ['월', '화'], ['월'], 5, 'normal', [], {}, []),
+                new Person('문지애', ['목', '금'], ['목'], 5, 'normal', [], {}, []),
+                new Person('전병남', ['수', '목'], ['수'], 5, 'normal', [], {}, []),
+                new Person('노현정', ['화', '수'], ['화'], 5, 'normal', [], {}, []),
+                new Person('백지원', [], [], 5, 'limited', [], {}, []),
+                new Person('박수정', ['금', '월'], ['금'], 5, 'normal', [{start: 5, end: 12}], {}, [])
             ];
             renderPersonList();
             showMessage('예시 데이터가 로드되었습니다. (김나영: 1주차 월/수, 2주차 목/금 불가)', 'success');
@@ -718,7 +733,7 @@ title: 병원 당직표 생성기
                 }
             }
 
-            people.push(new Person(name, unavailableDays, alternativeDays, maxDuties, secondDutyPref, [], weeklyRestrictions));
+            people.push(new Person(name, unavailableDays, alternativeDays, maxDuties, secondDutyPref, [], weeklyRestrictions, []));
 
             // Clear form
             document.getElementById('newPersonName').value = '';
@@ -812,6 +827,25 @@ title: 병원 당직표 생성기
                     weeklyHTML += '</div>';
                 }
 
+                // Preferred duty days display
+                let preferredHTML = '';
+                if (person.preferredDutyDays && person.preferredDutyDays.length > 0) {
+                    preferredHTML = '<div class="vacation-list" style="margin-top: 10px;">';
+                    person.preferredDutyDays.forEach((pref, pIdx) => {
+                        let typeText = '';
+                        if (pref.type === 'primary') typeText = '당직';
+                        else if (pref.type === 'secondary') typeText = '2nd duty';
+                        else typeText = '당직/2nd';
+                        preferredHTML += `
+                            <div class="vacation-item">
+                                <span>⭐ Day ${pref.day}: ${typeText}</span>
+                                <button class="danger btn-remove-preferred" data-person-index="${index}" data-preferred-index="${pIdx}" style="padding: 3px 8px; font-size: 12px;">삭제</button>
+                            </div>
+                        `;
+                    });
+                    preferredHTML += '</div>';
+                }
+
                 html += `
                     <div class="person-entry">
                         <h3>${person.name}${badge}</h3>
@@ -822,6 +856,7 @@ title: 병원 당직표 생성기
                         </p>
                         ${weeklyHTML}
                         ${vacationHTML}
+                        ${preferredHTML}
 
                         <div class="vacation-form" style="background: #e8f4f8;">
                             <label style="font-size: 13px; margin-bottom: 5px;">주별 제약 추가</label>
@@ -866,6 +901,26 @@ title: 병원 당직표 생성기
                             </div>
                             <button class="btn-add-vacation" data-person-index="${index}" style="padding: 6px 12px; font-size: 13px; margin-top: 5px;">휴가 추가</button>
                         </div>
+
+                        <div class="vacation-form" style="background: #fff3e6;">
+                            <label style="font-size: 13px; margin-bottom: 5px;">선호 당직 날짜 추가</label>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <div>
+                                    <label style="font-size: 12px; margin: 3px 0;">날짜 (Day)</label>
+                                    <input type="number" id="prefDay_${index}" min="1" max="20" placeholder="1-20" style="width: 100%; padding: 5px;">
+                                </div>
+                                <div>
+                                    <label style="font-size: 12px; margin: 3px 0;">유형</label>
+                                    <select id="prefType_${index}" style="width: 100%; padding: 5px;">
+                                        <option value="any">당직/2nd</option>
+                                        <option value="primary">당직만</option>
+                                        <option value="secondary">2nd만</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button class="btn-add-preferred" data-person-index="${index}" style="padding: 6px 12px; font-size: 13px; margin-top: 5px;">선호 날짜 추가</button>
+                        </div>
+
                         <button class="danger btn-remove-person" data-person-index="${index}" style="padding: 6px 12px; font-size: 14px; margin-top: 10px;">인원 삭제</button>
                     </div>
                 `;
@@ -950,6 +1005,43 @@ title: 병원 당직표 생성기
             }
         }
 
+        // Add preferred duty day
+        function addPreferredDuty(personIndex) {
+            const dayInput = document.getElementById(`prefDay_${personIndex}`);
+            const typeInput = document.getElementById(`prefType_${personIndex}`);
+
+            const day = parseInt(dayInput.value);
+            const type = typeInput.value;
+
+            if (!day || day < 1 || day > 20) {
+                showMessage('Day는 1부터 20 사이여야 합니다.', 'error');
+                return;
+            }
+
+            people[personIndex].addPreferredDuty(day, type);
+            dayInput.value = '';
+            typeInput.value = 'any';
+            renderPersonList();
+            showMessage(`${people[personIndex].name}의 선호 당직 날짜가 추가되었습니다. (Day ${day})`, 'success');
+        }
+
+        // Remove preferred duty day
+        function removePreferredDuty(personIndex, preferredIndex) {
+            const person = people[personIndex];
+            if (!person || !person.preferredDutyDays || !person.preferredDutyDays[preferredIndex]) {
+                showMessage('삭제 오류: 선호 당직 날짜를 찾을 수 없습니다.', 'error');
+                return;
+            }
+
+            const pref = person.preferredDutyDays[preferredIndex];
+            let typeText = pref.type === 'primary' ? '당직' : pref.type === 'secondary' ? '2nd duty' : '당직/2nd';
+            if (confirm(`${person.name}의 선호 당직 (Day ${pref.day}: ${typeText})을 삭제하시겠습니까?`)) {
+                person.preferredDutyDays.splice(preferredIndex, 1);
+                renderPersonList();
+                showMessage('선호 당직 날짜가 삭제되었습니다.', 'success');
+            }
+        }
+
         // Generate schedule
         function generateSchedule() {
             if (people.length === 0) {
@@ -987,56 +1079,94 @@ title: 병원 당직표 생성기
                     const dayOfWeek = DAYS_OF_WEEK[day % 5];
                     const dayNumber = day + 1;
 
-                    // Find primary duty
-                    const primaryCandidates = people.filter(p =>
+                    // Find primary duty - check for preferred duty first
+                    let primary = null;
+                    const preferredPrimaryPeople = people.filter(p =>
+                        p.hasPreferredDuty(dayNumber, 'primary') &&
                         p.canDoPrimaryDuty(dayOfWeek, dayNumber, weekNumber) &&
                         p.canTakeMoreDuties() &&
                         !isConsecutive(schedule, p.name, day)
-                    ).sort((a, b) => {
-                        // If same maxDuties, balance total duties within the group
-                        if (a.maxDuties === b.maxDuties) {
-                            return a.getTotalDuties() - b.getTotalDuties();
-                        }
-                        // Otherwise compare by primary count
-                        return a.primaryCount - b.primaryCount;
-                    });
+                    );
 
-                    if (primaryCandidates.length === 0) {
+                    if (preferredPrimaryPeople.length > 0) {
+                        primary = preferredPrimaryPeople[0];
+                    } else {
+                        const primaryCandidates = people.filter(p =>
+                            p.canDoPrimaryDuty(dayOfWeek, dayNumber, weekNumber) &&
+                            p.canTakeMoreDuties() &&
+                            !isConsecutive(schedule, p.name, day)
+                        ).sort((a, b) => {
+                            // If same maxDuties, balance total duties within the group
+                            if (a.maxDuties === b.maxDuties) {
+                                return a.getTotalDuties() - b.getTotalDuties();
+                            }
+                            // Otherwise compare by primary count
+                            return a.primaryCount - b.primaryCount;
+                        });
+
+                        if (primaryCandidates.length === 0) {
+                            success = false;
+                            break;
+                        }
+
+                        primary = primaryCandidates[0];
+                    }
+
+                    if (!primary) {
                         success = false;
                         break;
                     }
 
-                    const primary = primaryCandidates[0];
-
-                    // Find secondary duty
-                    const secondaryCandidates = people.filter(p =>
+                    // Find secondary duty - check for preferred duty first
+                    let secondary = null;
+                    const preferredSecondaryPeople = people.filter(p =>
                         p !== primary &&
+                        p.hasPreferredDuty(dayNumber, 'secondary') &&
                         p.canDoSecondaryDuty(dayOfWeek, dayNumber, weekNumber) &&
                         (p.secondDutyPref === 'preferred' ||
                          (p.secondDutyPref === '2nd-only' && p.canTakeMoreDuties()) ||
                          (p.secondDutyPref === 'limited' && p.secondaryCount < 1) ||
                          (p.secondDutyPref === 'normal' && p.canTakeMoreDuties())) &&
                         !isConsecutive(schedule, p.name, day)
-                    ).sort((a, b) => {
-                        // Prefer people who prefer 2nd duty or are 2nd-only
-                        if (a.secondDutyPref === 'preferred' && b.secondDutyPref !== 'preferred') return -1;
-                        if (b.secondDutyPref === 'preferred' && a.secondDutyPref !== 'preferred') return 1;
-                        if (a.secondDutyPref === '2nd-only' && b.secondDutyPref !== '2nd-only' && b.secondDutyPref !== 'preferred') return -1;
-                        if (b.secondDutyPref === '2nd-only' && a.secondDutyPref !== '2nd-only' && a.secondDutyPref !== 'preferred') return 1;
+                    );
 
-                        // If same maxDuties, balance total duties within the group
-                        if (a.maxDuties === b.maxDuties) {
-                            return a.getTotalDuties() - b.getTotalDuties();
+                    if (preferredSecondaryPeople.length > 0) {
+                        secondary = preferredSecondaryPeople[0];
+                    } else {
+                        const secondaryCandidates = people.filter(p =>
+                            p !== primary &&
+                            p.canDoSecondaryDuty(dayOfWeek, dayNumber, weekNumber) &&
+                            (p.secondDutyPref === 'preferred' ||
+                             (p.secondDutyPref === '2nd-only' && p.canTakeMoreDuties()) ||
+                             (p.secondDutyPref === 'limited' && p.secondaryCount < 1) ||
+                             (p.secondDutyPref === 'normal' && p.canTakeMoreDuties())) &&
+                            !isConsecutive(schedule, p.name, day)
+                        ).sort((a, b) => {
+                            // Prefer people who prefer 2nd duty or are 2nd-only
+                            if (a.secondDutyPref === 'preferred' && b.secondDutyPref !== 'preferred') return -1;
+                            if (b.secondDutyPref === 'preferred' && a.secondDutyPref !== 'preferred') return 1;
+                            if (a.secondDutyPref === '2nd-only' && b.secondDutyPref !== '2nd-only' && b.secondDutyPref !== 'preferred') return -1;
+                            if (b.secondDutyPref === '2nd-only' && a.secondDutyPref !== '2nd-only' && a.secondDutyPref !== 'preferred') return 1;
+
+                            // If same maxDuties, balance total duties within the group
+                            if (a.maxDuties === b.maxDuties) {
+                                return a.getTotalDuties() - b.getTotalDuties();
+                            }
+                            return a.secondaryCount - b.secondaryCount;
+                        });
+
+                        if (secondaryCandidates.length === 0) {
+                            success = false;
+                            break;
                         }
-                        return a.secondaryCount - b.secondaryCount;
-                    });
 
-                    if (secondaryCandidates.length === 0) {
+                        secondary = secondaryCandidates[0];
+                    }
+
+                    if (!secondary) {
                         success = false;
                         break;
                     }
-
-                    const secondary = secondaryCandidates[0];
 
                     schedule.push({
                         day: dayNumber,
@@ -1098,64 +1228,104 @@ title: 병원 당직표 생성기
                     const dayOfWeek = DAYS_OF_WEEK[day % 5];
                     const dayNumber = day + 1;
 
-                    // Find primary duty with randomization
-                    const primaryCandidates = people.filter(p =>
+                    // Find primary duty - check for preferred duty first
+                    let primary = null;
+                    const preferredPrimaryPeople = people.filter(p =>
+                        p.hasPreferredDuty(dayNumber, 'primary') &&
                         p.canDoPrimaryDuty(dayOfWeek, dayNumber, weekNumber) &&
                         p.canTakeMoreDuties() &&
                         !isConsecutive(tempSchedule, p.name, day)
-                    ).sort((a, b) => {
-                        // If same maxDuties, balance total duties within the group
-                        if (a.maxDuties === b.maxDuties) {
-                            return a.getTotalDuties() - b.getTotalDuties();
-                        }
-                        // Otherwise compare by primary count
-                        return a.primaryCount - b.primaryCount;
-                    });
+                    );
 
-                    if (primaryCandidates.length === 0) {
+                    if (preferredPrimaryPeople.length > 0) {
+                        primary = preferredPrimaryPeople[0];
+                    } else {
+                        // Find primary duty with randomization
+                        const primaryCandidates = people.filter(p =>
+                            p.canDoPrimaryDuty(dayOfWeek, dayNumber, weekNumber) &&
+                            p.canTakeMoreDuties() &&
+                            !isConsecutive(tempSchedule, p.name, day)
+                        ).sort((a, b) => {
+                            // If same maxDuties, balance total duties within the group
+                            if (a.maxDuties === b.maxDuties) {
+                                return a.getTotalDuties() - b.getTotalDuties();
+                            }
+                            // Otherwise compare by primary count
+                            return a.primaryCount - b.primaryCount;
+                        });
+
+                        if (primaryCandidates.length === 0) {
+                            success = false;
+                            break;
+                        }
+
+                        // Randomly select from candidates with lowest total duties in same maxDuties group
+                        const firstCandidate = primaryCandidates[0];
+                        const bestCandidates = primaryCandidates.filter(p =>
+                            p.maxDuties === firstCandidate.maxDuties &&
+                            p.getTotalDuties() === firstCandidate.getTotalDuties()
+                        );
+                        primary = bestCandidates[Math.floor(Math.random() * bestCandidates.length)];
+                    }
+
+                    if (!primary) {
                         success = false;
                         break;
                     }
 
-                    // Randomly select from candidates with lowest total duties in same maxDuties group
-                    const firstCandidate = primaryCandidates[0];
-                    const bestCandidates = primaryCandidates.filter(p =>
-                        p.maxDuties === firstCandidate.maxDuties &&
-                        p.getTotalDuties() === firstCandidate.getTotalDuties()
-                    );
-                    const primary = bestCandidates[Math.floor(Math.random() * bestCandidates.length)];
-
-                    // Find secondary duty with randomization
-                    const secondaryCandidates = people.filter(p =>
+                    // Find secondary duty - check for preferred duty first
+                    let secondary = null;
+                    const preferredSecondaryPeople = people.filter(p =>
                         p !== primary &&
+                        p.hasPreferredDuty(dayNumber, 'secondary') &&
                         p.canDoSecondaryDuty(dayOfWeek, dayNumber, weekNumber) &&
                         (p.secondDutyPref === 'preferred' ||
                          (p.secondDutyPref === '2nd-only' && p.canTakeMoreDuties()) ||
                          (p.secondDutyPref === 'limited' && p.secondaryCount < 1) ||
                          (p.secondDutyPref === 'normal' && p.canTakeMoreDuties())) &&
                         !isConsecutive(tempSchedule, p.name, day)
-                    ).sort((a, b) => {
-                        // Prefer people who prefer 2nd duty or are 2nd-only
-                        if (a.secondDutyPref === 'preferred' && b.secondDutyPref !== 'preferred') return -1;
-                        if (b.secondDutyPref === 'preferred' && a.secondDutyPref !== 'preferred') return 1;
-                        if (a.secondDutyPref === '2nd-only' && b.secondDutyPref !== '2nd-only' && b.secondDutyPref !== 'preferred') return -1;
-                        if (b.secondDutyPref === '2nd-only' && a.secondDutyPref !== '2nd-only' && a.secondDutyPref !== 'preferred') return 1;
+                    );
 
-                        // If same maxDuties, balance total duties within the group
-                        if (a.maxDuties === b.maxDuties) {
-                            return a.getTotalDuties() - b.getTotalDuties();
+                    if (preferredSecondaryPeople.length > 0) {
+                        secondary = preferredSecondaryPeople[0];
+                    } else {
+                        // Find secondary duty with randomization
+                        const secondaryCandidates = people.filter(p =>
+                            p !== primary &&
+                            p.canDoSecondaryDuty(dayOfWeek, dayNumber, weekNumber) &&
+                            (p.secondDutyPref === 'preferred' ||
+                             (p.secondDutyPref === '2nd-only' && p.canTakeMoreDuties()) ||
+                             (p.secondDutyPref === 'limited' && p.secondaryCount < 1) ||
+                             (p.secondDutyPref === 'normal' && p.canTakeMoreDuties())) &&
+                            !isConsecutive(tempSchedule, p.name, day)
+                        ).sort((a, b) => {
+                            // Prefer people who prefer 2nd duty or are 2nd-only
+                            if (a.secondDutyPref === 'preferred' && b.secondDutyPref !== 'preferred') return -1;
+                            if (b.secondDutyPref === 'preferred' && a.secondDutyPref !== 'preferred') return 1;
+                            if (a.secondDutyPref === '2nd-only' && b.secondDutyPref !== '2nd-only' && b.secondDutyPref !== 'preferred') return -1;
+                            if (b.secondDutyPref === '2nd-only' && a.secondDutyPref !== '2nd-only' && a.secondDutyPref !== 'preferred') return 1;
+
+                            // If same maxDuties, balance total duties within the group
+                            if (a.maxDuties === b.maxDuties) {
+                                return a.getTotalDuties() - b.getTotalDuties();
+                            }
+                            return a.secondaryCount - b.secondaryCount;
+                        });
+
+                        if (secondaryCandidates.length === 0) {
+                            success = false;
+                            break;
                         }
-                        return a.secondaryCount - b.secondaryCount;
-                    });
 
-                    if (secondaryCandidates.length === 0) {
+                        // Randomly select from top candidates
+                        const topCandidates = secondaryCandidates.slice(0, Math.min(3, secondaryCandidates.length));
+                        secondary = topCandidates[Math.floor(Math.random() * topCandidates.length)];
+                    }
+
+                    if (!secondary) {
                         success = false;
                         break;
                     }
-
-                    // Randomly select from top candidates
-                    const topCandidates = secondaryCandidates.slice(0, Math.min(3, secondaryCandidates.length));
-                    const secondary = topCandidates[Math.floor(Math.random() * topCandidates.length)];
 
                     tempSchedule.push({
                         day: dayNumber,
@@ -1571,6 +1741,19 @@ title: 병원 당직표 생성기
             if (target.classList.contains('btn-add-weekly')) {
                 const personIndex = parseInt(target.getAttribute('data-person-index'));
                 addWeeklyRestriction(personIndex);
+            }
+
+            // Add preferred duty button
+            if (target.classList.contains('btn-add-preferred')) {
+                const personIndex = parseInt(target.getAttribute('data-person-index'));
+                addPreferredDuty(personIndex);
+            }
+
+            // Remove preferred duty button
+            if (target.classList.contains('btn-remove-preferred')) {
+                const personIndex = parseInt(target.getAttribute('data-person-index'));
+                const preferredIndex = parseInt(target.getAttribute('data-preferred-index'));
+                removePreferredDuty(personIndex, preferredIndex);
             }
         });
     </script>
