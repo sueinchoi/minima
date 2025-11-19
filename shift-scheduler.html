@@ -1360,6 +1360,63 @@ title: 병원 당직표 생성기
             }
 
             const day = schedule[dayIndex];
+            const dayOfWeek = day.dayOfWeek;
+            const dayNumber = day.day;
+            const weekNumber = day.week;
+
+            // Find person objects
+            const primaryPerson = people.find(p => p.name === newPrimary);
+            const secondaryPerson = people.find(p => p.name === newSecondary);
+
+            // Validate primary duty assignment
+            if (primaryPerson) {
+                if (!primaryPerson.canDoPrimaryDuty(dayOfWeek, dayNumber, weekNumber)) {
+                    let reason = '';
+                    if (primaryPerson.isOnVacation(dayNumber)) {
+                        reason = `휴가 중입니다 (Day ${dayNumber}).`;
+                    } else if (primaryPerson.secondDutyPref === '2nd-only') {
+                        reason = '2nd duty만 가능한 사람입니다.';
+                    } else if (primaryPerson.weeklyRestrictions[weekNumber] &&
+                               primaryPerson.weeklyRestrictions[weekNumber].unavailable &&
+                               primaryPerson.weeklyRestrictions[weekNumber].unavailable.includes(dayOfWeek)) {
+                        reason = `${weekNumber}주차 ${dayOfWeek}요일은 불가능합니다.`;
+                    } else if (primaryPerson.unavailableDays.includes(dayOfWeek)) {
+                        reason = `${dayOfWeek}요일은 당직이 불가능합니다.`;
+                    }
+
+                    if (!confirm(`⚠️ ${newPrimary}님을 Day ${dayNumber} (${dayOfWeek}요일) 당직으로 배정하시겠습니까?\n\n경고: ${reason}\n\n그래도 배정하시겠습니까?`)) {
+                        return;
+                    }
+                }
+            }
+
+            // Validate secondary duty assignment
+            if (secondaryPerson) {
+                if (!secondaryPerson.canDoSecondaryDuty(dayOfWeek, dayNumber, weekNumber)) {
+                    let reason = '';
+                    if (secondaryPerson.isOnVacation(dayNumber)) {
+                        reason = `휴가 중입니다 (Day ${dayNumber}).`;
+                    } else if (secondaryPerson.weeklyRestrictions[weekNumber] &&
+                               secondaryPerson.weeklyRestrictions[weekNumber].unavailable &&
+                               secondaryPerson.weeklyRestrictions[weekNumber].unavailable.includes(dayOfWeek)) {
+                        const alternativeAllowed = secondaryPerson.weeklyRestrictions[weekNumber].alternative &&
+                                                  secondaryPerson.weeklyRestrictions[weekNumber].alternative.includes(dayOfWeek);
+                        if (!alternativeAllowed) {
+                            reason = `${weekNumber}주차 ${dayOfWeek}요일은 불가능합니다 (2nd duty도 불가).`;
+                        }
+                    } else if (secondaryPerson.unavailableDays.includes(dayOfWeek)) {
+                        const alternativeAllowed = secondaryPerson.alternativeDays.includes(dayOfWeek);
+                        if (!alternativeAllowed) {
+                            reason = `${dayOfWeek}요일은 불가능합니다 (2nd duty도 불가).`;
+                        }
+                    }
+
+                    if (reason && !confirm(`⚠️ ${newSecondary}님을 Day ${dayNumber} (${dayOfWeek}요일) 2nd duty로 배정하시겠습니까?\n\n경고: ${reason}\n\n그래도 배정하시겠습니까?`)) {
+                        return;
+                    }
+                }
+            }
+
             const oldPrimary = day.primary;
             const oldSecondary = day.secondary;
 
