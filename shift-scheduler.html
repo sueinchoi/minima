@@ -528,6 +528,17 @@ title: 병원 당직표 생성기
                     <button type="button" onclick="addNewPreferredDutyField()" style="padding: 5px 10px; font-size: 12px; margin-top: 10px; background: #f39c12; color: white; border: none; border-radius: 3px; cursor: pointer;">➕ 선호 날짜 추가</button>
                 </div>
 
+                <div style="margin-top: 15px; padding: 15px; background: #e8f5e9; border-radius: 5px; border-left: 3px solid #27ae60;">
+                    <label style="font-size: 14px; font-weight: 600; color: #2c3e50;">🏖️ 휴가 (선택사항)</label>
+                    <p class="small-text" style="margin: 5px 0 10px 0;">휴가 기간 동안은 당직 및 2nd 당직에서 제외됩니다.</p>
+
+                    <div id="newPersonVacations" style="margin-top: 10px;">
+                        <!-- Vacation entries will be added here -->
+                    </div>
+
+                    <button type="button" onclick="addNewVacationField()" style="padding: 5px 10px; font-size: 12px; margin-top: 10px; background: #27ae60; color: white; border: none; border-radius: 3px; cursor: pointer;">➕ 휴가 추가</button>
+                </div>
+
                 <div class="button-group">
                     <button onclick="addPerson()">➕ 인원 추가</button>
                 </div>
@@ -750,6 +761,39 @@ title: 병원 당직표 생성기
             }
         }
 
+        // Manage vacation fields in the add person form
+        let newPersonVacationCounter = 0;
+
+        function addNewVacationField() {
+            const container = document.getElementById('newPersonVacations');
+            const fieldId = newPersonVacationCounter++;
+
+            const fieldHTML = `
+                <div class="new-vacation-field" id="newVacationField_${fieldId}" style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; margin-bottom: 10px; padding: 10px; background: white; border-radius: 4px;">
+                    <div>
+                        <label style="font-size: 12px; margin: 3px 0;">시작일 (Day)</label>
+                        <input type="number" class="new-vacation-start" data-field-id="${fieldId}" min="1" max="20" placeholder="1-20" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; margin: 3px 0;">종료일 (Day)</label>
+                        <input type="number" class="new-vacation-end" data-field-id="${fieldId}" min="1" max="20" placeholder="1-20" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                    </div>
+                    <div style="display: flex; align-items: flex-end;">
+                        <button type="button" onclick="removeNewVacationField(${fieldId})" style="padding: 5px 10px; font-size: 12px; background: #e74c3c; color: white; border: none; border-radius: 3px; cursor: pointer;">삭제</button>
+                    </div>
+                </div>
+            `;
+
+            container.insertAdjacentHTML('beforeend', fieldHTML);
+        }
+
+        function removeNewVacationField(fieldId) {
+            const field = document.getElementById(`newVacationField_${fieldId}`);
+            if (field) {
+                field.remove();
+            }
+        }
+
         function addPerson() {
             const name = document.getElementById('newPersonName').value.trim();
             if (!name) {
@@ -795,7 +839,25 @@ title: 병원 당직표 생성기
                 }
             }
 
-            people.push(new Person(name, unavailableDays, alternativeDays, maxDuties, secondDutyPref, [], weeklyRestrictions, preferredDutyDays));
+            // Read vacations
+            const vacations = [];
+            const vacationStartInputs = document.querySelectorAll('.new-vacation-start');
+            const vacationEndInputs = document.querySelectorAll('.new-vacation-end');
+
+            for (let i = 0; i < vacationStartInputs.length; i++) {
+                const start = parseInt(vacationStartInputs[i].value);
+                const end = parseInt(vacationEndInputs[i].value);
+
+                if (start && end && start >= 1 && start <= 20 && end >= 1 && end <= 20) {
+                    if (start > end) {
+                        showMessage(`휴가 ${i + 1}: 시작일은 종료일보다 이전이어야 합니다.`, 'error');
+                        return;
+                    }
+                    vacations.push({ start, end });
+                }
+            }
+
+            people.push(new Person(name, unavailableDays, alternativeDays, maxDuties, secondDutyPref, vacations, weeklyRestrictions, preferredDutyDays));
 
             // Clear form
             document.getElementById('newPersonName').value = '';
@@ -812,6 +874,9 @@ title: 병원 당직표 생성기
 
             // Clear preferred duty dates
             document.getElementById('newPersonPreferredDuties').innerHTML = '';
+
+            // Clear vacations
+            document.getElementById('newPersonVacations').innerHTML = '';
 
             renderPersonList();
             showMessage(`${name} 님이 추가되었습니다.`, 'success');
