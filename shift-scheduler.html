@@ -785,7 +785,7 @@ title: 병원 당직표 생성기
                         vacationHTML += `
                             <div class="vacation-item">
                                 <span>🏖️ Day ${vacation.start} ~ ${vacation.end}</span>
-                                <button onclick="removeVacation(${index}, ${vIdx})" class="danger" style="padding: 3px 8px; font-size: 12px;">삭제</button>
+                                <button class="danger btn-remove-vacation" data-person-index="${index}" data-vacation-index="${vIdx}" style="padding: 3px 8px; font-size: 12px;">삭제</button>
                             </div>
                         `;
                     });
@@ -805,7 +805,7 @@ title: 병원 당직표 생성기
                         weeklyHTML += `
                             <div class="vacation-item">
                                 <span>📅 ${weekNum}주차: ${unavailText}${altText}</span>
-                                <button onclick="removeWeeklyRestriction(${index}, ${weekNum})" class="danger" style="padding: 3px 8px; font-size: 12px;">삭제</button>
+                                <button class="danger btn-remove-weekly" data-person-index="${index}" data-week-num="${weekNum}" style="padding: 3px 8px; font-size: 12px;">삭제</button>
                             </div>
                         `;
                     });
@@ -854,7 +854,7 @@ title: 병원 당직표 생성기
                                     </div>
                                 </div>
                             </div>
-                            <button onclick="addWeeklyRestriction(${index})" style="padding: 6px 12px; font-size: 13px; margin-top: 5px;">주별 제약 추가</button>
+                            <button class="btn-add-weekly" data-person-index="${index}" style="padding: 6px 12px; font-size: 13px; margin-top: 5px;">주별 제약 추가</button>
                         </div>
 
                         <div class="vacation-form">
@@ -864,9 +864,9 @@ title: 병원 당직표 생성기
                                 <span>~</span>
                                 <input type="number" id="vacEnd_${index}" min="1" max="20" placeholder="종료일">
                             </div>
-                            <button onclick="addVacation(${index})" style="padding: 6px 12px; font-size: 13px; margin-top: 5px;">휴가 추가</button>
+                            <button class="btn-add-vacation" data-person-index="${index}" style="padding: 6px 12px; font-size: 13px; margin-top: 5px;">휴가 추가</button>
                         </div>
-                        <button onclick="removePerson(${index})" class="danger" style="padding: 6px 12px; font-size: 14px; margin-top: 10px;">인원 삭제</button>
+                        <button class="danger btn-remove-person" data-person-index="${index}" style="padding: 6px 12px; font-size: 14px; margin-top: 10px;">인원 삭제</button>
                     </div>
                 `;
             });
@@ -893,30 +893,14 @@ title: 병원 당직표 생성기
 
         // Remove weekly restriction
         function removeWeeklyRestriction(personIndex, weekNum) {
-            console.log('removeWeeklyRestriction called:', personIndex, weekNum);
-
-            if (personIndex === undefined || weekNum === undefined) {
-                alert('삭제 오류: 잘못된 인덱스입니다. personIndex=' + personIndex + ', weekNum=' + weekNum);
-                showMessage('삭제 오류: 잘못된 인덱스입니다.', 'error');
-                return;
-            }
-
             const person = people[personIndex];
-            if (!person) {
-                alert('삭제 오류: 인원을 찾을 수 없습니다. personIndex=' + personIndex);
-                showMessage('삭제 오류: 인원을 찾을 수 없습니다.', 'error');
-                return;
-            }
-
-            if (!person.weeklyRestrictions || !person.weeklyRestrictions[weekNum]) {
-                alert('삭제 오류: 해당 주차 제약을 찾을 수 없습니다. weekNum=' + weekNum);
+            if (!person || !person.weeklyRestrictions || !person.weeklyRestrictions[weekNum]) {
                 showMessage('삭제 오류: 해당 주차 제약을 찾을 수 없습니다.', 'error');
                 return;
             }
 
             if (confirm(`${person.name}의 ${weekNum}주차 제약을 삭제하시겠습니까?`)) {
                 delete person.weeklyRestrictions[weekNum];
-                console.log('Weekly restriction removed for week', weekNum);
                 renderPersonList();
                 showMessage('주별 제약이 삭제되었습니다.', 'success');
             }
@@ -952,37 +936,15 @@ title: 병원 당직표 생성기
 
         // Remove vacation
         function removeVacation(personIndex, vacationIndex) {
-            console.log('removeVacation called:', personIndex, vacationIndex);
-
-            if (personIndex === undefined || vacationIndex === undefined) {
-                alert('삭제 오류: 잘못된 인덱스입니다. personIndex=' + personIndex + ', vacationIndex=' + vacationIndex);
-                showMessage('삭제 오류: 잘못된 인덱스입니다.', 'error');
-                return;
-            }
-
             const person = people[personIndex];
-            if (!person) {
-                alert('삭제 오류: 인원을 찾을 수 없습니다. personIndex=' + personIndex);
-                showMessage('삭제 오류: 인원을 찾을 수 없습니다.', 'error');
-                return;
-            }
-
-            if (!person.vacations || !Array.isArray(person.vacations)) {
-                alert('삭제 오류: 휴가 목록이 없습니다.');
-                showMessage('삭제 오류: 휴가 목록이 없습니다.', 'error');
-                return;
-            }
-
-            const vacation = person.vacations[vacationIndex];
-            if (!vacation) {
-                alert('삭제 오류: 휴가를 찾을 수 없습니다. vacationIndex=' + vacationIndex + ', 총 휴가 수=' + person.vacations.length);
+            if (!person || !person.vacations || !person.vacations[vacationIndex]) {
                 showMessage('삭제 오류: 휴가를 찾을 수 없습니다.', 'error');
                 return;
             }
 
+            const vacation = person.vacations[vacationIndex];
             if (confirm(`${person.name}의 휴가 (Day ${vacation.start} ~ ${vacation.end})를 삭제하시겠습니까?`)) {
                 person.vacations.splice(vacationIndex, 1);
-                console.log('Vacation removed, remaining:', person.vacations.length);
                 renderPersonList();
                 showMessage('휴가가 삭제되었습니다.', 'success');
             }
@@ -1574,6 +1536,43 @@ title: 병원 당직표 생성기
 
         // Initialize
         renderPersonList();
+
+        // Event delegation for dynamically created buttons
+        document.getElementById('personList').addEventListener('click', function(e) {
+            const target = e.target;
+
+            // Remove vacation button
+            if (target.classList.contains('btn-remove-vacation')) {
+                const personIndex = parseInt(target.getAttribute('data-person-index'));
+                const vacationIndex = parseInt(target.getAttribute('data-vacation-index'));
+                removeVacation(personIndex, vacationIndex);
+            }
+
+            // Remove weekly restriction button
+            if (target.classList.contains('btn-remove-weekly')) {
+                const personIndex = parseInt(target.getAttribute('data-person-index'));
+                const weekNum = target.getAttribute('data-week-num');
+                removeWeeklyRestriction(personIndex, weekNum);
+            }
+
+            // Remove person button
+            if (target.classList.contains('btn-remove-person')) {
+                const personIndex = parseInt(target.getAttribute('data-person-index'));
+                removePerson(personIndex);
+            }
+
+            // Add vacation button
+            if (target.classList.contains('btn-add-vacation')) {
+                const personIndex = parseInt(target.getAttribute('data-person-index'));
+                addVacation(personIndex);
+            }
+
+            // Add weekly restriction button
+            if (target.classList.contains('btn-add-weekly')) {
+                const personIndex = parseInt(target.getAttribute('data-person-index'));
+                addWeeklyRestriction(personIndex);
+            }
+        });
     </script>
 </body>
 </html>
