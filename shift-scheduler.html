@@ -1192,6 +1192,8 @@ title: 병원 당직표 생성기
             let success = true;
             let attempts = 0;
             const maxAttempts = 100;
+            let failureReason = '';
+            let failureDay = 0;
 
             while (attempts < maxAttempts) {
                 attempts++;
@@ -1202,6 +1204,7 @@ title: 병원 당직표 생성기
                 });
 
                 success = true;
+                failureReason = '';
 
                 for (let day = 0; day < TOTAL_DAYS; day++) {
                     const week = Math.floor(day / 5);
@@ -1241,6 +1244,8 @@ title: 병원 당직표 생성기
 
                         if (primaryCandidates.length === 0) {
                             success = false;
+                            failureDay = dayNumber;
+                            failureReason = `Day ${dayNumber} (${dayOfWeek}, ${weekNumber}주차): 당직을 배정할 수 있는 사람이 없습니다. 불가능한 요일, 휴가, 최대 당직 횟수, 연속 당직 등을 확인해주세요.`;
                             break;
                         }
 
@@ -1249,6 +1254,10 @@ title: 병원 당직표 생성기
 
                     if (!primary) {
                         success = false;
+                        if (!failureReason) {
+                            failureDay = dayNumber;
+                            failureReason = `Day ${dayNumber} (${dayOfWeek}, ${weekNumber}주차): 당직을 배정할 수 없습니다.`;
+                        }
                         break;
                     }
 
@@ -1294,6 +1303,8 @@ title: 병원 당직표 생성기
 
                         if (secondaryCandidates.length === 0) {
                             success = false;
+                            failureDay = dayNumber;
+                            failureReason = `Day ${dayNumber} (${dayOfWeek}, ${weekNumber}주차): 2nd 당직을 배정할 수 있는 사람이 없습니다. 2nd Duty 선호도, 불가능한 요일, 휴가, 최대 당직 횟수 등을 확인해주세요.`;
                             break;
                         }
 
@@ -1302,6 +1313,10 @@ title: 병원 당직표 생성기
 
                     if (!secondary) {
                         success = false;
+                        if (!failureReason) {
+                            failureDay = dayNumber;
+                            failureReason = `Day ${dayNumber} (${dayOfWeek}, ${weekNumber}주차): 2nd 당직을 배정할 수 없습니다.`;
+                        }
                         break;
                     }
 
@@ -1321,7 +1336,19 @@ title: 병원 당직표 생성기
             }
 
             if (!success) {
-                showMessage(`당직표 생성에 실패했습니다. 조건을 완화해주세요. (${attempts}번 시도)`, 'error');
+                let errorMsg = '당직표 생성에 실패했습니다.\n\n';
+                if (failureReason) {
+                    errorMsg += `❌ ${failureReason}\n\n`;
+                }
+                errorMsg += `💡 해결 방법:\n`;
+                errorMsg += `- 최대 당직 횟수를 늘려주세요\n`;
+                errorMsg += `- 불가능한 요일 수를 줄여주세요\n`;
+                errorMsg += `- 인원을 추가해주세요\n`;
+                errorMsg += `- 휴가 기간을 조정해주세요\n\n`;
+                errorMsg += `(${attempts}번 시도)`;
+
+                alert(errorMsg);
+                showMessage('당직표 생성 실패', 'error');
                 return;
             }
 
@@ -1477,7 +1504,17 @@ title: 병원 당직표 생성기
             }
 
             if (schedules.length === 0) {
-                showMessage('당직표 생성에 실패했습니다. 조건을 완화해주세요.', 'error');
+                let errorMsg = '당직표 생성에 실패했습니다.\n\n';
+                errorMsg += `❌ ${totalAttempts}번 시도했지만 조건을 만족하는 당직표를 생성하지 못했습니다.\n\n`;
+                errorMsg += `💡 해결 방법:\n`;
+                errorMsg += `- 최대 당직 횟수를 늘려주세요\n`;
+                errorMsg += `- 불가능한 요일 수를 줄여주세요\n`;
+                errorMsg += `- 인원을 추가해주세요\n`;
+                errorMsg += `- 휴가 기간을 조정해주세요\n`;
+                errorMsg += `- 주별 제약 조건을 완화해주세요`;
+
+                alert(errorMsg);
+                showMessage('당직표 생성 실패', 'error');
                 return;
             }
 
