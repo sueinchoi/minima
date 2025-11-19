@@ -418,6 +418,105 @@ title: 병원 당직표 생성기
                     <option value="2nd-only">2nd duty만</option>
                 </select>
 
+                <div style="margin-top: 15px; padding: 15px; background: #f0f8ff; border-radius: 5px; border-left: 3px solid #3498db;">
+                    <label style="font-size: 14px; font-weight: 600; color: #2c3e50;">📅 주별 제약 (선택사항)</label>
+                    <p class="small-text" style="margin: 5px 0 10px 0;">각 주차별로 다른 불가능한 요일을 설정할 수 있습니다.</p>
+
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 10px;">
+                        <!-- 1주차 -->
+                        <div style="background: white; padding: 10px; border-radius: 4px;">
+                            <strong style="font-size: 13px; color: #e74c3c;">1주차</strong>
+                            <div style="margin-top: 5px;">
+                                <label style="font-size: 11px; margin: 3px 0;">불가능</label>
+                                <div class="checkbox-group">
+                                    <label style="font-size: 12px;"><input type="checkbox" value="월" class="new-week1-unavailable"> 월</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="화" class="new-week1-unavailable"> 화</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="수" class="new-week1-unavailable"> 수</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="목" class="new-week1-unavailable"> 목</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="금" class="new-week1-unavailable"> 금</label>
+                                </div>
+                                <label style="font-size: 11px; margin: 3px 0;">2nd 가능</label>
+                                <div class="checkbox-group">
+                                    <label style="font-size: 12px;"><input type="checkbox" value="월" class="new-week1-alternative"> 월</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="화" class="new-week1-alternative"> 화</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="수" class="new-week1-alternative"> 수</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="목" class="new-week1-alternative"> 목</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="금" class="new-week1-alternative"> 금</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2주차 -->
+                        <div style="background: white; padding: 10px; border-radius: 4px;">
+                            <strong style="font-size: 13px; color: #3498db;">2주차</strong>
+                            <div style="margin-top: 5px;">
+                                <label style="font-size: 11px; margin: 3px 0;">불가능</label>
+                                <div class="checkbox-group">
+                                    <label style="font-size: 12px;"><input type="checkbox" value="월" class="new-week2-unavailable"> 월</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="화" class="new-week2-unavailable"> 화</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="수" class="new-week2-unavailable"> 수</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="목" class="new-week2-unavailable"> 목</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="금" class="new-week2-unavailable"> 금</label>
+                                </div>
+                                <label style="font-size: 11px; margin: 3px 0;">2nd 가능</label>
+                                <div class="checkbox-group">
+                                    <label style="font-size: 12px;"><input type="checkbox" value="월" class="new-week2-alternative"> 월</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="화" class="new-week2-alternative"> 화</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="수" class="new-week2-alternative"> 수</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="목" class="new-week2-alternative"> 목</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="금" class="new-week2-alternative"> 금</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 3주차 -->
+                        <div style="background: white; padding: 10px; border-radius: 4px;">
+                            <strong style="font-size: 13px; color: #27ae60;">3주차</strong>
+                            <div style="margin-top: 5px;">
+                                <label style="font-size: 11px; margin: 3px 0;">불가능</label>
+                                <div class="checkbox-group">
+                                    <label style="font-size: 12px;"><input type="checkbox" value="월" class="new-week3-unavailable"> 월</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="화" class="new-week3-unavailable"> 화</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="수" class="new-week3-unavailable"> 수</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="목" class="new-week3-unavailable"> 목</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="금" class="new-week3-unavailable"> 금</label>
+                                </div>
+                                <label style="font-size: 11px; margin: 3px 0;">2nd 가능</label>
+                                <div class="checkbox-group">
+                                    <label style="font-size: 12px;"><input type="checkbox" value="월" class="new-week3-alternative"> 월</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="화" class="new-week3-alternative"> 화</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="수" class="new-week3-alternative"> 수</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="목" class="new-week3-alternative"> 목</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="금" class="new-week3-alternative"> 금</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 4주차 -->
+                        <div style="background: white; padding: 10px; border-radius: 4px;">
+                            <strong style="font-size: 13px; color: #f39c12;">4주차</strong>
+                            <div style="margin-top: 5px;">
+                                <label style="font-size: 11px; margin: 3px 0;">불가능</label>
+                                <div class="checkbox-group">
+                                    <label style="font-size: 12px;"><input type="checkbox" value="월" class="new-week4-unavailable"> 월</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="화" class="new-week4-unavailable"> 화</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="수" class="new-week4-unavailable"> 수</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="목" class="new-week4-unavailable"> 목</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="금" class="new-week4-unavailable"> 금</label>
+                                </div>
+                                <label style="font-size: 11px; margin: 3px 0;">2nd 가능</label>
+                                <div class="checkbox-group">
+                                    <label style="font-size: 12px;"><input type="checkbox" value="월" class="new-week4-alternative"> 월</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="화" class="new-week4-alternative"> 화</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="수" class="new-week4-alternative"> 수</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="목" class="new-week4-alternative"> 목</label>
+                                    <label style="font-size: 12px;"><input type="checkbox" value="금" class="new-week4-alternative"> 금</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="button-group">
                     <button onclick="addPerson()">➕ 인원 추가</button>
                 </div>
@@ -593,7 +692,24 @@ title: 병원 당직표 생성기
             const maxDuties = parseInt(document.getElementById('newPersonMaxDuties').value) || 5;
             const secondDutyPref = document.getElementById('newPersonSecondDutyPref').value;
 
-            people.push(new Person(name, unavailableDays, alternativeDays, maxDuties, secondDutyPref));
+            // Read weekly restrictions
+            const weeklyRestrictions = {};
+            for (let week = 1; week <= 4; week++) {
+                const weekUnavailable = Array.from(document.querySelectorAll(`.new-week${week}-unavailable:checked`))
+                    .map(cb => cb.value);
+                const weekAlternative = Array.from(document.querySelectorAll(`.new-week${week}-alternative:checked`))
+                    .map(cb => cb.value);
+
+                // Only add if there are restrictions for this week
+                if (weekUnavailable.length > 0 || weekAlternative.length > 0) {
+                    weeklyRestrictions[week] = {
+                        unavailable: weekUnavailable,
+                        alternative: weekAlternative
+                    };
+                }
+            }
+
+            people.push(new Person(name, unavailableDays, alternativeDays, maxDuties, secondDutyPref, [], weeklyRestrictions));
 
             // Clear form
             document.getElementById('newPersonName').value = '';
@@ -601,6 +717,12 @@ title: 병원 당직표 생성기
             document.querySelectorAll('.new-alternative-day').forEach(cb => cb.checked = false);
             document.getElementById('newPersonMaxDuties').value = 5;
             document.getElementById('newPersonSecondDutyPref').value = 'normal';
+
+            // Clear weekly restrictions
+            for (let week = 1; week <= 4; week++) {
+                document.querySelectorAll(`.new-week${week}-unavailable`).forEach(cb => cb.checked = false);
+                document.querySelectorAll(`.new-week${week}-alternative`).forEach(cb => cb.checked = false);
+            }
 
             renderPersonList();
             showMessage(`${name} 님이 추가되었습니다.`, 'success');
