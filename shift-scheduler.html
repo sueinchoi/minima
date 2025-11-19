@@ -517,6 +517,17 @@ title: 병원 당직표 생성기
                     </div>
                 </div>
 
+                <div style="margin-top: 15px; padding: 15px; background: #fff3e6; border-radius: 5px; border-left: 3px solid #f39c12;">
+                    <label style="font-size: 14px; font-weight: 600; color: #2c3e50;">⭐ 선호 당직 날짜 (선택사항)</label>
+                    <p class="small-text" style="margin: 5px 0 10px 0;">특정 날짜에 당직 또는 2nd 당직으로 우선 배정됩니다.</p>
+
+                    <div id="newPersonPreferredDuties" style="margin-top: 10px;">
+                        <!-- Preferred duty entries will be added here -->
+                    </div>
+
+                    <button type="button" onclick="addNewPreferredDutyField()" style="padding: 5px 10px; font-size: 12px; margin-top: 10px; background: #f39c12; color: white; border: none; border-radius: 3px; cursor: pointer;">➕ 선호 날짜 추가</button>
+                </div>
+
                 <div class="button-group">
                     <button onclick="addPerson()">➕ 인원 추가</button>
                 </div>
@@ -702,6 +713,43 @@ title: 병원 당직표 생성기
         }
 
         // Add person
+        // Manage preferred duty fields in the add person form
+        let newPersonPreferredDutyCounter = 0;
+
+        function addNewPreferredDutyField() {
+            const container = document.getElementById('newPersonPreferredDuties');
+            const fieldId = newPersonPreferredDutyCounter++;
+
+            const fieldHTML = `
+                <div class="new-preferred-duty-field" id="newPreferredField_${fieldId}" style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; margin-bottom: 10px; padding: 10px; background: white; border-radius: 4px;">
+                    <div>
+                        <label style="font-size: 12px; margin: 3px 0;">날짜 (Day)</label>
+                        <input type="number" class="new-preferred-day" data-field-id="${fieldId}" min="1" max="20" placeholder="1-20" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; margin: 3px 0;">유형</label>
+                        <select class="new-preferred-type" data-field-id="${fieldId}" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                            <option value="any">당직/2nd</option>
+                            <option value="primary">당직만</option>
+                            <option value="secondary">2nd만</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; align-items: flex-end;">
+                        <button type="button" onclick="removeNewPreferredDutyField(${fieldId})" style="padding: 5px 10px; font-size: 12px; background: #e74c3c; color: white; border: none; border-radius: 3px; cursor: pointer;">삭제</button>
+                    </div>
+                </div>
+            `;
+
+            container.insertAdjacentHTML('beforeend', fieldHTML);
+        }
+
+        function removeNewPreferredDutyField(fieldId) {
+            const field = document.getElementById(`newPreferredField_${fieldId}`);
+            if (field) {
+                field.remove();
+            }
+        }
+
         function addPerson() {
             const name = document.getElementById('newPersonName').value.trim();
             if (!name) {
@@ -733,7 +781,21 @@ title: 병원 당직표 생성기
                 }
             }
 
-            people.push(new Person(name, unavailableDays, alternativeDays, maxDuties, secondDutyPref, [], weeklyRestrictions, []));
+            // Read preferred duty dates
+            const preferredDutyDays = [];
+            const preferredDayInputs = document.querySelectorAll('.new-preferred-day');
+            const preferredTypeInputs = document.querySelectorAll('.new-preferred-type');
+
+            for (let i = 0; i < preferredDayInputs.length; i++) {
+                const day = parseInt(preferredDayInputs[i].value);
+                const type = preferredTypeInputs[i].value;
+
+                if (day && day >= 1 && day <= 20) {
+                    preferredDutyDays.push({ day, type });
+                }
+            }
+
+            people.push(new Person(name, unavailableDays, alternativeDays, maxDuties, secondDutyPref, [], weeklyRestrictions, preferredDutyDays));
 
             // Clear form
             document.getElementById('newPersonName').value = '';
@@ -747,6 +809,9 @@ title: 병원 당직표 생성기
                 document.querySelectorAll(`.new-week${week}-unavailable`).forEach(cb => cb.checked = false);
                 document.querySelectorAll(`.new-week${week}-alternative`).forEach(cb => cb.checked = false);
             }
+
+            // Clear preferred duty dates
+            document.getElementById('newPersonPreferredDuties').innerHTML = '';
 
             renderPersonList();
             showMessage(`${name} 님이 추가되었습니다.`, 'success');
