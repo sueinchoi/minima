@@ -384,19 +384,22 @@ title: 병원 당직표 생성기
         <div class="input-section" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; margin-bottom: 20px;">
             <h2 style="color: white;">💬 빠른 인원 추가 (챗봇)</h2>
             <p style="font-size: 13px; opacity: 0.9; margin-bottom: 15px;">
-                자연어로 입력하면 자동으로 파싱됩니다. 예: "김철수는 월요일과 수요일 불가능하고 최대 5회 당직 가능"
+                간단하게 입력하세요! 요일만 언급하면 불가능으로 자동 인식됩니다.
             </p>
 
             <div id="chatHistory" style="background: rgba(255,255,255,0.1); border-radius: 8px; padding: 15px; margin-bottom: 15px; max-height: 300px; overflow-y: auto; min-height: 150px;">
                 <div style="color: rgba(255,255,255,0.7); font-size: 13px; text-align: center; padding: 20px;">
-                    채팅으로 인원을 추가해보세요!<br>
-                    예시: "이영희 휴가 5일부터 10일까지"<br>
-                    "박민수 선호날짜 3일 당직"
+                    💡 채팅으로 인원을 추가해보세요!<br><br>
+                    <strong>예시:</strong><br>
+                    "김철수 월 수" → 월, 수 불가능<br>
+                    "이영희 휴가 5-10" → 5일~10일 휴가<br>
+                    "박민수 월 화 5회" → 월화 불가, 5회<br>
+                    "최진호 선호 3일 당직" → 3일 당직 선호
                 </div>
             </div>
 
             <div style="display: flex; gap: 10px;">
-                <input type="text" id="chatInput" placeholder="예: 김철수는 월요일과 수요일 불가능하고 최대 5회 당직 가능"
+                <input type="text" id="chatInput" placeholder="예: 김철수 월 수 / 이영희 휴가 5-10 / 박민수 월 화 5회"
                     style="flex: 1; padding: 12px; border: 2px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.95); border-radius: 6px;"
                     onkeypress="if(event.key==='Enter') processChatInput()">
                 <button onclick="processChatInput()" style="padding: 12px 24px; background: white; color: #667eea; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;">
@@ -934,21 +937,31 @@ title: 병원 당직표 생성기
                 secondDutyPref: 'normal',
                 vacations: [],
                 preferredDutyDays: [],
-                action: 'add' // 'add', 'vacation', 'preferred'
+                action: 'add'
             };
 
-            // Extract name (first word or before 은/는/이/가)
-            const nameMatch = text.match(/^([가-힣]+)(은|는|이|가|\s)/);
+            // Extract name - improved to handle particles properly
+            // Remove common particles: 은/는/이/가/을/를/에게/한테
+            let nameMatch = text.match(/^([가-힣]{2,})(은|는|이|가|을|를|에게|한테|님)/);
             if (nameMatch) {
                 result.name = nameMatch[1];
             } else {
-                const firstWord = text.split(/\s+/)[0];
-                if (/^[가-힣]+$/.test(firstWord)) {
-                    result.name = firstWord;
+                // Just get first hangul word
+                nameMatch = text.match(/^([가-힣]{2,})/);
+                if (nameMatch) {
+                    result.name = nameMatch[1];
                 }
             }
 
-            // Extract days of week
+            // If no name found, return early
+            if (!result.name) {
+                return result;
+            }
+
+            // Remove name from text for easier parsing
+            const textWithoutName = text.replace(result.name, '').replace(/^(은|는|이|가|을|를|에게|한테|님)+/, '').trim();
+
+            // Days of week mapping
             const dayMap = {
                 '월': '월', '월요일': '월',
                 '화': '화', '화요일': '화',
@@ -957,62 +970,83 @@ title: 병원 당직표 생성기
                 '금': '금', '금요일': '금'
             };
 
-            // Unavailable days
-            for (const [key, value] of Object.entries(dayMap)) {
-                if (text.includes(key) && (text.includes('불가능') || text.includes('못함') || text.includes('안됨') || text.includes('불가') || text.includes('휴무'))) {
-                    if (!result.unavailableDays.includes(value)) {
-                        result.unavailableDays.push(value);
-                    }
-                }
-            }
-
-            // Alternative days (2nd duty possible)
-            for (const [key, value] of Object.entries(dayMap)) {
-                const beforeKey = text.indexOf(key);
-                const after = text.substring(beforeKey);
-                if (after.match(/2nd.*?가능|세컨드.*?가능|대체.*?가능/)) {
-                    if (!result.alternativeDays.includes(value) && result.unavailableDays.includes(value)) {
-                        result.alternativeDays.push(value);
-                    }
-                }
-            }
-
-            // Max duties
-            const maxMatch = text.match(/(\d+)\s*(회|번)/);
-            if (maxMatch) {
-                result.maxDuties = parseInt(maxMatch[1]);
-            }
-
-            // 2nd duty preference
-            if (text.includes('2nd만') || text.includes('2nd duty만') || text.includes('세컨드만')) {
-                result.secondDutyPref = '2nd-only';
-            } else if (text.includes('2nd 선호') || text.includes('2nd duty 선호') || text.includes('세컨드 선호')) {
-                result.secondDutyPref = 'preferred';
-            } else if (text.includes('제한적') || text.includes('2nd 1회')) {
-                result.secondDutyPref = 'limited';
-            }
-
-            // Vacation
-            const vacationMatch = text.match(/휴가.*?(\d+).*?(\d+)|(\d+).*?(\d+).*?휴가|(\d+)\s*[-~]\s*(\d+)/);
-            if (vacationMatch && text.includes('휴가')) {
-                const start = parseInt(vacationMatch[1] || vacationMatch[3] || vacationMatch[5]);
-                const end = parseInt(vacationMatch[2] || vacationMatch[4] || vacationMatch[6]);
+            // Check for vacation with date range first
+            const vacationWithDates = textWithoutName.match(/휴가.*?(\d+).*?(\d+)|(\d+).*?(\d+).*?휴가|(\d+)\s*[-~]\s*(\d+)/);
+            if (vacationWithDates && textWithoutName.includes('휴가')) {
+                const start = parseInt(vacationWithDates[1] || vacationWithDates[3] || vacationWithDates[5]);
+                const end = parseInt(vacationWithDates[2] || vacationWithDates[4] || vacationWithDates[6]);
                 if (start && end && start <= end && start >= 1 && end <= 20) {
                     result.vacations.push({ start, end });
                     result.action = 'vacation';
+                    return result; // Vacation request, don't parse other stuff
                 }
             }
 
-            // Preferred duty days
-            const preferredMatch = text.match(/선호.*?(\d+).*?(당직|2nd)|(\d+).*?(당직|2nd).*?선호|(\d+)일.*?(당직|2nd)/);
-            if (preferredMatch) {
+            // Extract all mentioned weekdays
+            const mentionedDays = [];
+            for (const [key, value] of Object.entries(dayMap)) {
+                if (textWithoutName.includes(key)) {
+                    if (!mentionedDays.includes(value)) {
+                        mentionedDays.push(value);
+                    }
+                }
+            }
+
+            // Preferred duty days - check before unavailable days
+            const preferredMatch = textWithoutName.match(/선호.*?(\d+).*?(당직|2nd)|(\d+).*?(당직|2nd).*?선호|(\d+)일.*?(당직|2nd)/);
+            if (preferredMatch && (textWithoutName.includes('선호') || textWithoutName.includes('원하'))) {
                 const day = parseInt(preferredMatch[1] || preferredMatch[3] || preferredMatch[5]);
                 const typeText = preferredMatch[2] || preferredMatch[4] || preferredMatch[6];
                 const type = typeText === '2nd' ? 'secondary' : 'primary';
                 if (day >= 1 && day <= 20) {
                     result.preferredDutyDays.push({ day, type });
                     result.action = 'preferred';
+                    return result;
                 }
+            }
+
+            // Check if mentioned days are unavailable or alternative
+            // Keywords that indicate unavailability
+            const unavailableKeywords = ['불가능', '불가', '못함', '못해', '안됨', '안돼', 'X', '×', '휴무'];
+            const alternativeKeywords = ['2nd', '세컨드', '대체'];
+
+            const hasUnavailableKeyword = unavailableKeywords.some(kw => textWithoutName.includes(kw));
+
+            if (mentionedDays.length > 0) {
+                // If no explicit unavailable keyword but days are mentioned, assume they're unavailable
+                // This handles cases like "김철수 월 수" → assume unavailable
+                if (hasUnavailableKeyword || !textWithoutName.match(/가능|선호|2nd|세컨드/)) {
+                    result.unavailableDays = [...mentionedDays];
+                }
+
+                // Check for alternative (2nd duty possible) for each day
+                for (const day of mentionedDays) {
+                    // Look for pattern: "월 2nd", "월 2nd 가능", "월요일 세컨드"
+                    const dayIndex = textWithoutName.indexOf(day);
+                    const afterDay = textWithoutName.substring(dayIndex);
+                    const beforeNextDay = afterDay.split(/[화수목금월]/)[0]; // Text until next day
+
+                    if (alternativeKeywords.some(kw => beforeNextDay.includes(kw)) || beforeNextDay.includes('가능')) {
+                        if (!result.alternativeDays.includes(day) && result.unavailableDays.includes(day)) {
+                            result.alternativeDays.push(day);
+                        }
+                    }
+                }
+            }
+
+            // Max duties
+            const maxMatch = textWithoutName.match(/(\d+)\s*(회|번)/);
+            if (maxMatch) {
+                result.maxDuties = parseInt(maxMatch[1]);
+            }
+
+            // 2nd duty preference
+            if (textWithoutName.match(/2nd\s*(만|duty만)|세컨드만/)) {
+                result.secondDutyPref = '2nd-only';
+            } else if (textWithoutName.match(/2nd\s*선호|세컨드\s*선호/)) {
+                result.secondDutyPref = 'preferred';
+            } else if (textWithoutName.match(/제한적|2nd\s*1회/)) {
+                result.secondDutyPref = 'limited';
             }
 
             return result;
