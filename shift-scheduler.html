@@ -389,12 +389,15 @@ title: 병원 당직표 생성기
 
             <div id="chatHistory" style="background: rgba(255,255,255,0.1); border-radius: 8px; padding: 15px; margin-bottom: 15px; max-height: 300px; overflow-y: auto; min-height: 150px;">
                 <div style="color: rgba(255,255,255,0.7); font-size: 13px; text-align: center; padding: 20px;">
-                    💡 채팅으로 인원을 추가해보세요!<br><br>
-                    <strong>예시:</strong><br>
+                    💡 채팅으로 인원을 추가하고 수정하세요!<br><br>
+                    <strong>신규 추가:</strong><br>
                     "김철수 월 수" → 월, 수 불가능<br>
-                    "이영희 휴가 5-10" → 5일~10일 휴가<br>
-                    "박민수 월 화 5회" → 월화 불가, 5회<br>
-                    "최진호 선호 3일 당직" → 3일 당직 선호
+                    "이영희 월 화 5회" → 월화 불가, 5회<br><br>
+                    <strong>기존 인원 수정:</strong><br>
+                    "김철수 최대 8회" → 최대 횟수 변경<br>
+                    "이영희 2nd만" → 2nd duty 설정<br>
+                    "박민수 휴가 5-10" → 휴가 추가<br>
+                    "최진호 선호 3일 당직" → 선호일 추가
                 </div>
             </div>
 
@@ -1034,8 +1037,8 @@ title: 병원 당직표 생성기
                 }
             }
 
-            // Max duties
-            const maxMatch = textWithoutName.match(/(\d+)\s*(회|번)/);
+            // Max duties - support "최대 5회", "8회", "최대 8번" etc
+            const maxMatch = textWithoutName.match(/(?:최대\s*)?(\d+)\s*(회|번)/);
             if (maxMatch) {
                 result.maxDuties = parseInt(maxMatch[1]);
             }
@@ -1104,7 +1107,55 @@ title: 병원 당직표 생성기
             }
 
             if (existingPerson && parsed.action === 'add') {
-                addChatMessage(`ℹ️ ${parsed.name}님은 이미 등록되어 있습니다. 휴가나 선호날짜를 추가하려면 "휴가" 또는 "선호" 키워드를 사용하세요.`);
+                // Update existing person's information
+                let updated = false;
+                let updateMsg = `✅ ${parsed.name}님의 정보가 업데이트되었습니다!<br>`;
+
+                // Update unavailable days (if specified)
+                if (parsed.unavailableDays.length > 0) {
+                    // Add new unavailable days (don't replace, add to existing)
+                    parsed.unavailableDays.forEach(day => {
+                        if (!existingPerson.unavailableDays.includes(day)) {
+                            existingPerson.unavailableDays.push(day);
+                        }
+                    });
+                    updateMsg += `- 불가능한 요일 추가: ${parsed.unavailableDays.join(', ')}<br>`;
+                    updated = true;
+                }
+
+                // Update alternative days (if specified)
+                if (parsed.alternativeDays.length > 0) {
+                    parsed.alternativeDays.forEach(day => {
+                        if (!existingPerson.alternativeDays.includes(day)) {
+                            existingPerson.alternativeDays.push(day);
+                        }
+                    });
+                    updateMsg += `- 2nd 가능 추가: ${parsed.alternativeDays.join(', ')}<br>`;
+                    updated = true;
+                }
+
+                // Update max duties (if different from default 5)
+                if (parsed.maxDuties !== 5) {
+                    existingPerson.maxDuties = parsed.maxDuties;
+                    updateMsg += `- 최대 당직: ${parsed.maxDuties}회로 변경<br>`;
+                    updated = true;
+                }
+
+                // Update 2nd duty preference (if not normal)
+                if (parsed.secondDutyPref !== 'normal') {
+                    existingPerson.secondDutyPref = parsed.secondDutyPref;
+                    const prefText = parsed.secondDutyPref === '2nd-only' ? '2nd만' :
+                                    parsed.secondDutyPref === 'preferred' ? '2nd 선호' : '제한적';
+                    updateMsg += `- 2nd Duty: ${prefText}으로 변경<br>`;
+                    updated = true;
+                }
+
+                if (updated) {
+                    renderPersonList();
+                    addChatMessage(updateMsg);
+                } else {
+                    addChatMessage(`ℹ️ ${parsed.name}님은 이미 등록되어 있습니다. 업데이트할 정보를 입력해주세요.<br>예: "${parsed.name} 최대 8회", "${parsed.name} 2nd만"`);
+                }
                 return;
             }
 
@@ -1484,15 +1535,16 @@ title: 병원 당직표 생성기
 
                     // Find primary duty - check for preferred duty first
                     let primary = null;
-                    // For preferred duty, only check if person is not on vacation (ignore all other constraints)
+                    // For preferred duty, MUST check max duties (absolute constraint) and vacation
                     const preferredPrimaryPeople = people.filter(p =>
                         p.hasPreferredDuty(dayNumber, 'primary') &&
-                        !p.isOnVacation(dayNumber)
+                        !p.isOnVacation(dayNumber) &&
+                        p.canTakeMoreDuties() // ABSOLUTE: must respect max duties
                     );
 
                     // Debug logging
                     if (preferredPrimaryPeople.length > 0) {
-                        console.log(`✅ Day ${dayNumber}: Found ${preferredPrimaryPeople.length} people with preferred primary duty:`, preferredPrimaryPeople.map(p => p.name), '(constraints bypassed)');
+                        console.log(`✅ Day ${dayNumber}: Found ${preferredPrimaryPeople.length} people with preferred primary duty:`, preferredPrimaryPeople.map(p => p.name), '(max duties checked)');
                     }
 
                     if (preferredPrimaryPeople.length > 0) {
@@ -1533,16 +1585,17 @@ title: 병원 당직표 생성기
 
                     // Find secondary duty - check for preferred duty first
                     let secondary = null;
-                    // For preferred duty, only check if person is not on vacation and not already primary (ignore all other constraints)
+                    // For preferred duty, MUST check max duties (absolute constraint) and vacation
                     const preferredSecondaryPeople = people.filter(p =>
                         p !== primary &&
                         p.hasPreferredDuty(dayNumber, 'secondary') &&
-                        !p.isOnVacation(dayNumber)
+                        !p.isOnVacation(dayNumber) &&
+                        p.canTakeMoreDuties() // ABSOLUTE: must respect max duties
                     );
 
                     // Debug logging
                     if (preferredSecondaryPeople.length > 0) {
-                        console.log(`✅ Day ${dayNumber}: Found ${preferredSecondaryPeople.length} people with preferred secondary duty:`, preferredSecondaryPeople.map(p => p.name), '(constraints bypassed)');
+                        console.log(`✅ Day ${dayNumber}: Found ${preferredSecondaryPeople.length} people with preferred secondary duty:`, preferredSecondaryPeople.map(p => p.name), '(max duties checked)');
                     }
 
                     if (preferredSecondaryPeople.length > 0) {
@@ -1664,10 +1717,11 @@ title: 병원 당직표 생성기
 
                     // Find primary duty - check for preferred duty first
                     let primary = null;
-                    // For preferred duty, only check if person is not on vacation (ignore all other constraints)
+                    // For preferred duty, MUST check max duties (absolute constraint) and vacation
                     const preferredPrimaryPeople = people.filter(p =>
                         p.hasPreferredDuty(dayNumber, 'primary') &&
-                        !p.isOnVacation(dayNumber)
+                        !p.isOnVacation(dayNumber) &&
+                        p.canTakeMoreDuties() // ABSOLUTE: must respect max duties
                     );
 
                     if (preferredPrimaryPeople.length > 0) {
@@ -1708,11 +1762,12 @@ title: 병원 당직표 생성기
 
                     // Find secondary duty - check for preferred duty first
                     let secondary = null;
-                    // For preferred duty, only check if person is not on vacation and not already primary (ignore all other constraints)
+                    // For preferred duty, MUST check max duties (absolute constraint) and vacation
                     const preferredSecondaryPeople = people.filter(p =>
                         p !== primary &&
                         p.hasPreferredDuty(dayNumber, 'secondary') &&
-                        !p.isOnVacation(dayNumber)
+                        !p.isOnVacation(dayNumber) &&
+                        p.canTakeMoreDuties() // ABSOLUTE: must respect max duties
                     );
 
                     if (preferredSecondaryPeople.length > 0) {
