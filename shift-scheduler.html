@@ -697,16 +697,25 @@ title: 병원 당직표 생성기
             }
 
             canTakeMoreDuties() {
-                if (this.secondDutyPref === 'preferred') {
-                    return true; // Unlimited for 2nd duty preferred
+                // ABSOLUTE CONSTRAINT: Total duties (primary + secondary) must not exceed maxDuties
+                // This is checked FIRST, regardless of preference
+                const totalDuties = this.getTotalDuties();
+                if (totalDuties >= this.maxDuties) {
+                    return false; // Already at or over max limit
                 }
+
+                // For specific preferences, apply additional rules
                 if (this.secondDutyPref === '2nd-only') {
-                    return this.secondaryCount < this.maxDuties; // Only 2nd duty counts for 2nd-only staff
+                    // 2nd-only staff: secondary count should also not exceed max
+                    return this.secondaryCount < this.maxDuties;
                 }
                 if (this.secondDutyPref === 'limited' && this.secondaryCount >= 1) {
+                    // Limited: max 1 secondary, rest primary
                     return this.primaryCount < this.maxDuties;
                 }
-                return this.getTotalDuties() < this.maxDuties;
+
+                // For 'preferred' and 'normal', just check total (already checked above)
+                return true;
             }
 
             addVacation(start, end) {
@@ -2112,13 +2121,17 @@ title: 병원 당직표 생성기
             let html = '<div class="stats"><h3>📊 통계</h3><div class="stats-grid">';
             people.forEach(person => {
                 const total = person.primaryCount + person.secondaryCount;
+                const isOverMax = total > person.maxDuties;
+                const totalColor = isOverMax ? 'color: #e74c3c; font-weight: bold;' : '';
+                const warningIcon = isOverMax ? ' ⚠️' : '';
+
                 html += `
-                    <div class="stat-item">
-                        <strong>${person.name}</strong><br>
+                    <div class="stat-item" style="${isOverMax ? 'border: 2px solid #e74c3c; background: #ffe6e6;' : ''}">
+                        <strong>${person.name}</strong> (최대: ${person.maxDuties}회)${warningIcon}<br>
                         <span class="small-text">
                             당직: ${person.primaryCount}회 |
                             2nd: ${person.secondaryCount}회 |
-                            총: ${total}회
+                            <span style="${totalColor}">총: ${total}회</span>
                         </span>
                     </div>
                 `;
