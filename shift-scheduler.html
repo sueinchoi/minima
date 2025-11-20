@@ -380,6 +380,31 @@ title: 병원 당직표 생성기
     <h1>🏥 병원 당직표 자동 생성기</h1>
 
     <div class="container">
+        <!-- Chatbot Section -->
+        <div class="input-section" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; margin-bottom: 20px;">
+            <h2 style="color: white;">💬 빠른 인원 추가 (챗봇)</h2>
+            <p style="font-size: 13px; opacity: 0.9; margin-bottom: 15px;">
+                자연어로 입력하면 자동으로 파싱됩니다. 예: "김철수는 월요일과 수요일 불가능하고 최대 5회 당직 가능"
+            </p>
+
+            <div id="chatHistory" style="background: rgba(255,255,255,0.1); border-radius: 8px; padding: 15px; margin-bottom: 15px; max-height: 300px; overflow-y: auto; min-height: 150px;">
+                <div style="color: rgba(255,255,255,0.7); font-size: 13px; text-align: center; padding: 20px;">
+                    채팅으로 인원을 추가해보세요!<br>
+                    예시: "이영희 휴가 5일부터 10일까지"<br>
+                    "박민수 선호날짜 3일 당직"
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <input type="text" id="chatInput" placeholder="예: 김철수는 월요일과 수요일 불가능하고 최대 5회 당직 가능"
+                    style="flex: 1; padding: 12px; border: 2px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.95); border-radius: 6px;"
+                    onkeypress="if(event.key==='Enter') processChatInput()">
+                <button onclick="processChatInput()" style="padding: 12px 24px; background: white; color: #667eea; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;">
+                    전송
+                </button>
+            </div>
+        </div>
+
         <!-- Input Section -->
         <div class="input-section">
             <h2>📋 인원 관리</h2>
@@ -880,6 +905,217 @@ title: 병원 당직표 생성기
 
             renderPersonList();
             showMessage(`${name} 님이 추가되었습니다.`, 'success');
+        }
+
+        // Chatbot functions
+        function addChatMessage(text, isUser = false) {
+            const chatHistory = document.getElementById('chatHistory');
+            const messageDiv = document.createElement('div');
+            messageDiv.style.cssText = `
+                margin-bottom: 10px;
+                padding: 10px 15px;
+                border-radius: 12px;
+                max-width: 80%;
+                ${isUser ? 'margin-left: auto; background: rgba(255,255,255,0.95); color: #333; text-align: right;' : 'background: rgba(255,255,255,0.2); color: white;'}
+                font-size: 14px;
+                line-height: 1.5;
+            `;
+            messageDiv.innerHTML = text;
+            chatHistory.appendChild(messageDiv);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+
+        function parseNaturalLanguage(text) {
+            const result = {
+                name: null,
+                unavailableDays: [],
+                alternativeDays: [],
+                maxDuties: 5,
+                secondDutyPref: 'normal',
+                vacations: [],
+                preferredDutyDays: [],
+                action: 'add' // 'add', 'vacation', 'preferred'
+            };
+
+            // Extract name (first word or before 은/는/이/가)
+            const nameMatch = text.match(/^([가-힣]+)(은|는|이|가|\s)/);
+            if (nameMatch) {
+                result.name = nameMatch[1];
+            } else {
+                const firstWord = text.split(/\s+/)[0];
+                if (/^[가-힣]+$/.test(firstWord)) {
+                    result.name = firstWord;
+                }
+            }
+
+            // Extract days of week
+            const dayMap = {
+                '월': '월', '월요일': '월',
+                '화': '화', '화요일': '화',
+                '수': '수', '수요일': '수',
+                '목': '목', '목요일': '목',
+                '금': '금', '금요일': '금'
+            };
+
+            // Unavailable days
+            for (const [key, value] of Object.entries(dayMap)) {
+                if (text.includes(key) && (text.includes('불가능') || text.includes('못함') || text.includes('안됨') || text.includes('불가') || text.includes('휴무'))) {
+                    if (!result.unavailableDays.includes(value)) {
+                        result.unavailableDays.push(value);
+                    }
+                }
+            }
+
+            // Alternative days (2nd duty possible)
+            for (const [key, value] of Object.entries(dayMap)) {
+                const beforeKey = text.indexOf(key);
+                const after = text.substring(beforeKey);
+                if (after.match(/2nd.*?가능|세컨드.*?가능|대체.*?가능/)) {
+                    if (!result.alternativeDays.includes(value) && result.unavailableDays.includes(value)) {
+                        result.alternativeDays.push(value);
+                    }
+                }
+            }
+
+            // Max duties
+            const maxMatch = text.match(/(\d+)\s*(회|번)/);
+            if (maxMatch) {
+                result.maxDuties = parseInt(maxMatch[1]);
+            }
+
+            // 2nd duty preference
+            if (text.includes('2nd만') || text.includes('2nd duty만') || text.includes('세컨드만')) {
+                result.secondDutyPref = '2nd-only';
+            } else if (text.includes('2nd 선호') || text.includes('2nd duty 선호') || text.includes('세컨드 선호')) {
+                result.secondDutyPref = 'preferred';
+            } else if (text.includes('제한적') || text.includes('2nd 1회')) {
+                result.secondDutyPref = 'limited';
+            }
+
+            // Vacation
+            const vacationMatch = text.match(/휴가.*?(\d+).*?(\d+)|(\d+).*?(\d+).*?휴가|(\d+)\s*[-~]\s*(\d+)/);
+            if (vacationMatch && text.includes('휴가')) {
+                const start = parseInt(vacationMatch[1] || vacationMatch[3] || vacationMatch[5]);
+                const end = parseInt(vacationMatch[2] || vacationMatch[4] || vacationMatch[6]);
+                if (start && end && start <= end && start >= 1 && end <= 20) {
+                    result.vacations.push({ start, end });
+                    result.action = 'vacation';
+                }
+            }
+
+            // Preferred duty days
+            const preferredMatch = text.match(/선호.*?(\d+).*?(당직|2nd)|(\d+).*?(당직|2nd).*?선호|(\d+)일.*?(당직|2nd)/);
+            if (preferredMatch) {
+                const day = parseInt(preferredMatch[1] || preferredMatch[3] || preferredMatch[5]);
+                const typeText = preferredMatch[2] || preferredMatch[4] || preferredMatch[6];
+                const type = typeText === '2nd' ? 'secondary' : 'primary';
+                if (day >= 1 && day <= 20) {
+                    result.preferredDutyDays.push({ day, type });
+                    result.action = 'preferred';
+                }
+            }
+
+            return result;
+        }
+
+        function processChatInput() {
+            const input = document.getElementById('chatInput');
+            const text = input.value.trim();
+
+            if (!text) return;
+
+            // Clear initial message if exists
+            const chatHistory = document.getElementById('chatHistory');
+            if (chatHistory.children.length === 1 && chatHistory.innerHTML.includes('채팅으로 인원을 추가해보세요')) {
+                chatHistory.innerHTML = '';
+            }
+
+            // Add user message
+            addChatMessage(text, true);
+            input.value = '';
+
+            // Parse input
+            const parsed = parseNaturalLanguage(text);
+
+            // Process based on action
+            if (!parsed.name) {
+                addChatMessage('❌ 이름을 찾을 수 없습니다. 예: "김철수는 월요일 불가능"');
+                return;
+            }
+
+            // Check if person already exists
+            const existingPerson = people.find(p => p.name === parsed.name);
+
+            if (parsed.action === 'vacation' && existingPerson) {
+                // Add vacation to existing person
+                if (parsed.vacations.length > 0) {
+                    const vac = parsed.vacations[0];
+                    existingPerson.vacations.push(vac);
+                    renderPersonList();
+                    addChatMessage(`✅ ${parsed.name}님의 휴가가 추가되었습니다. (Day ${vac.start} ~ ${vac.end})`);
+                }
+                return;
+            }
+
+            if (parsed.action === 'preferred' && existingPerson) {
+                // Add preferred duty to existing person
+                if (parsed.preferredDutyDays.length > 0) {
+                    const pref = parsed.preferredDutyDays[0];
+                    existingPerson.preferredDutyDays.push(pref);
+                    renderPersonList();
+                    const typeText = pref.type === 'primary' ? '당직' : '2nd duty';
+                    addChatMessage(`✅ ${parsed.name}님의 선호 날짜가 추가되었습니다. (Day ${pref.day} ${typeText})`);
+                }
+                return;
+            }
+
+            if (existingPerson && parsed.action === 'add') {
+                addChatMessage(`ℹ️ ${parsed.name}님은 이미 등록되어 있습니다. 휴가나 선호날짜를 추가하려면 "휴가" 또는 "선호" 키워드를 사용하세요.`);
+                return;
+            }
+
+            // Add new person
+            const newPerson = new Person(
+                parsed.name,
+                parsed.unavailableDays,
+                parsed.alternativeDays,
+                parsed.maxDuties,
+                parsed.secondDutyPref,
+                parsed.vacations,
+                {},
+                parsed.preferredDutyDays
+            );
+
+            people.push(newPerson);
+            renderPersonList();
+
+            // Build confirmation message
+            let confirmMsg = `✅ ${parsed.name}님이 추가되었습니다!<br>`;
+            if (parsed.unavailableDays.length > 0) {
+                confirmMsg += `- 불가능한 요일: ${parsed.unavailableDays.join(', ')}<br>`;
+            }
+            if (parsed.alternativeDays.length > 0) {
+                confirmMsg += `- 2nd 가능: ${parsed.alternativeDays.join(', ')}<br>`;
+            }
+            confirmMsg += `- 최대 당직: ${parsed.maxDuties}회<br>`;
+            if (parsed.secondDutyPref !== 'normal') {
+                const prefText = parsed.secondDutyPref === '2nd-only' ? '2nd만' :
+                                parsed.secondDutyPref === 'preferred' ? '2nd 선호' : '제한적';
+                confirmMsg += `- 2nd Duty: ${prefText}<br>`;
+            }
+            if (parsed.vacations.length > 0) {
+                parsed.vacations.forEach(v => {
+                    confirmMsg += `- 휴가: Day ${v.start} ~ ${v.end}<br>`;
+                });
+            }
+            if (parsed.preferredDutyDays.length > 0) {
+                parsed.preferredDutyDays.forEach(p => {
+                    const typeText = p.type === 'primary' ? '당직' : '2nd duty';
+                    confirmMsg += `- 선호: Day ${p.day} ${typeText}<br>`;
+                });
+            }
+
+            addChatMessage(confirmMsg);
         }
 
         // Remove person
