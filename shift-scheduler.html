@@ -2325,11 +2325,18 @@ title: 병원 당직표 생성기
             showMessage('당직표가 다운로드되었습니다.', 'success');
         }
 
-        // Initialize
-        renderPersonList();
+        // Initialize when DOM is ready
+        function initializeApp() {
+            renderPersonList();
 
-        // Event delegation for dynamically created buttons
-        document.getElementById('personList').addEventListener('click', function(e) {
+            // Event delegation for dynamically created buttons
+            const personListElement = document.getElementById('personList');
+            if (!personListElement) {
+                console.error('personList element not found!');
+                return;
+            }
+
+            personListElement.addEventListener('click', function(e) {
             // Check if clicked element or its parent is a button
             let btn = e.target.closest('button');
             if (!btn) return;
@@ -2430,7 +2437,16 @@ title: 병원 당직표 생성기
                 toggleEditMode(personIndex);
                 return;
             }
-        });
+            });
+        }
+
+        // Call initialization
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeApp);
+        } else {
+            // DOM already loaded
+            initializeApp();
+        }
 
         // Toggle edit mode for person
         function toggleEditMode(personIndex) {
