@@ -927,12 +927,10 @@
                 if (person.vacations && person.vacations.length > 0) {
                     vacationHTML = '<div class="vacation-list">';
                     person.vacations.forEach((vacation, vIdx) => {
-                        vacationHTML += `
-                            <div class="vacation-item">
-                                <span>🏖️ Day ${vacation.start} ~ ${vacation.end}</span>
-                                <button onclick="removeVacation(${index}, ${vIdx})" class="danger" style="padding: 3px 8px; font-size: 12px;">삭제</button>
-                            </div>
-                        `;
+                        vacationHTML += '<div class="vacation-item">';
+                        vacationHTML += '<span>🏖️ Day ' + vacation.start + ' ~ ' + vacation.end + '</span>';
+                        vacationHTML += '<button onclick="removeVacation(' + index + ', ' + vIdx + ')" class="danger" style="padding: 3px 8px; font-size: 12px;">삭제</button>';
+                        vacationHTML += '</div>';
                     });
                     vacationHTML += '</div>';
                 }
@@ -946,13 +944,11 @@
                         const unavailText = restriction.unavailable && restriction.unavailable.length > 0
                             ? restriction.unavailable.join(', ') : '없음';
                         const altText = restriction.alternative && restriction.alternative.length > 0
-                            ? `, 2nd 가능: ${restriction.alternative.join(', ')}` : '';
-                        weeklyHTML += `
-                            <div class="vacation-item">
-                                <span>📅 ${weekNum}주차: ${unavailText}${altText}</span>
-                                <button onclick="removeWeeklyRestriction(${index}, ${weekNum})" class="danger" style="padding: 3px 8px; font-size: 12px;">삭제</button>
-                            </div>
-                        `;
+                            ? ', 2nd 가능: ' + restriction.alternative.join(', ') : '';
+                        weeklyHTML += '<div class="vacation-item">';
+                        weeklyHTML += '<span>📅 ' + weekNum + '주차: ' + unavailText + altText + '</span>';
+                        weeklyHTML += '<button onclick="removeWeeklyRestriction(' + index + ', ' + weekNum + ')" class="danger" style="padding: 3px 8px; font-size: 12px;">삭제</button>';
+                        weeklyHTML += '</div>';
                     });
                     weeklyHTML += '</div>';
                 }
@@ -966,120 +962,116 @@
                         if (pref.type === 'primary') typeText = '당직';
                         else if (pref.type === 'secondary') typeText = '2nd duty';
                         else typeText = '당직/2nd';
-                        preferredHTML += `
-                            <div class="vacation-item">
-                                <span>⭐ Day ${pref.day}: ${typeText}</span>
-                                <button onclick="removePreferredDuty(${index}, ${pIdx})" class="danger" style="padding: 3px 8px; font-size: 12px;">삭제</button>
-                            </div>
-                        `;
+                        preferredHTML += '<div class="vacation-item">';
+                        preferredHTML += '<span>⭐ Day ' + pref.day + ': ' + typeText + '</span>';
+                        preferredHTML += '<button onclick="removePreferredDuty(' + index + ', ' + pIdx + ')" class="danger" style="padding: 3px 8px; font-size: 12px;">삭제</button>';
+                        preferredHTML += '</div>';
                     });
                     preferredHTML += '</div>';
                 }
 
-                html += `
-                    <div class="person-entry" id="person_${index}">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <h3 style="margin: 0;">${person.name}${badge}</h3>
-                            <button onclick="toggleEditMode(${index})" class="secondary" style="padding: 5px 10px; font-size: 12px;">⚙️ 정보 수정</button>
-                        </div>
+                html += '<div class="person-entry" id="person_' + index + '">';
+                html += '<div style="display: flex; justify-content: space-between; align-items: center;">';
+                html += '<h3 style="margin: 0;">' + person.name + badge + '</h3>';
+                html += '<button onclick="toggleEditMode(' + index + ')" class="secondary" style="padding: 5px 10px; font-size: 12px;">⚙️ 정보 수정</button>';
+                html += '</div>';
 
-                        <p class="small-text" style="margin-top: 10px;">
-                            <strong>당직 불가 (전체):</strong> ${person.unavailableDays.join(', ') || '없음'}<br>
-                            <strong>2nd 가능 (전체):</strong> ${person.alternativeDays.join(', ') || '해당없음'}<br>
-                            <strong>최대 횟수:</strong> ${person.maxDuties}회
-                        </p>
+                html += '<p class="small-text" style="margin-top: 10px;">';
+                html += '<strong>당직 불가 (전체):</strong> ' + (person.unavailableDays.join(', ') || '없음') + '<br>';
+                html += '<strong>2nd 가능 (전체):</strong> ' + (person.alternativeDays.join(', ') || '해당없음') + '<br>';
+                html += '<strong>최대 횟수:</strong> ' + person.maxDuties + '회';
+                html += '</p>';
 
-                        <div class="edit-controls" id="editControls_${index}" style="display: none;">
-                            <label style="font-size: 13px; font-weight: 600; color: #2c3e50;">기본 정보 수정</label>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px;">
-                                <div>
-                                    <label style="font-size: 12px;">최대 당직 횟수</label>
-                                    <input type="number" id="editMaxDuties_${index}" value="${person.maxDuties}" min="1" max="20" style="width: 100%; padding: 5px; font-size: 13px;">
-                                </div>
-                                <div>
-                                    <label style="font-size: 12px;">2nd Duty 선호도</label>
-                                    <select id="editSecondPref_${index}" style="width: 100%; padding: 5px; font-size: 13px;">
-                                        <option value="normal" ${person.secondDutyPref === 'normal' ? 'selected' : ''}>일반</option>
-                                        <option value="preferred" ${person.secondDutyPref === 'preferred' ? 'selected' : ''}>2nd 선호</option>
-                                        <option value="limited" ${person.secondDutyPref === 'limited' ? 'selected' : ''}>제한적 (2nd 1회만)</option>
-                                        <option value="2nd-only" ${person.secondDutyPref === '2nd-only' ? 'selected' : ''}>2nd만</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <button onclick="savePersonEdit(${index})" style="background: #27ae60; margin-top: 8px;">✓ 저장</button>
-                            <button onclick="toggleEditMode(${index})" class="secondary" style="margin-top: 8px;">취소</button>
-                        </div>
+                html += '<div class="edit-controls" id="editControls_' + index + '" style="display: none;">';
+                html += '<label style="font-size: 13px; font-weight: 600; color: #2c3e50;">기본 정보 수정</label>';
+                html += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px;">';
+                html += '<div>';
+                html += '<label style="font-size: 12px;">최대 당직 횟수</label>';
+                html += '<input type="number" id="editMaxDuties_' + index + '" value="' + person.maxDuties + '" min="1" max="20" style="width: 100%; padding: 5px; font-size: 13px;">';
+                html += '</div>';
+                html += '<div>';
+                html += '<label style="font-size: 12px;">2nd Duty 선호도</label>';
+                html += '<select id="editSecondPref_' + index + '" style="width: 100%; padding: 5px; font-size: 13px;">';
+                html += '<option value="normal"' + (person.secondDutyPref === 'normal' ? ' selected' : '') + '>일반</option>';
+                html += '<option value="preferred"' + (person.secondDutyPref === 'preferred' ? ' selected' : '') + '>2nd 선호</option>';
+                html += '<option value="limited"' + (person.secondDutyPref === 'limited' ? ' selected' : '') + '>제한적 (2nd 1회만)</option>';
+                html += '<option value="2nd-only"' + (person.secondDutyPref === '2nd-only' ? ' selected' : '') + '>2nd만</option>';
+                html += '</select>';
+                html += '</div>';
+                html += '</div>';
+                html += '<button onclick="savePersonEdit(' + index + ')" style="background: #27ae60; margin-top: 8px;">✓ 저장</button>';
+                html += '<button onclick="toggleEditMode(' + index + ')" class="secondary" style="margin-top: 8px;">취소</button>';
+                html += '</div>';
 
-                        ${weeklyHTML}
-                        ${vacationHTML}
-                        ${preferredHTML}
+                html += weeklyHTML;
+                html += vacationHTML;
+                html += preferredHTML;
 
-                        <div class="vacation-form" style="background: #e8f4f8;">
-                            <label style="font-size: 13px; margin-bottom: 5px;">주별 제약 추가</label>
-                            <div style="display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start;">
-                                <div>
-                                    <label style="font-size: 12px;">주차</label>
-                                    <select id="weekNum_${index}" style="width: 60px; padding: 5px; font-size: 13px;">
-                                        <option value="1">1주</option>
-                                        <option value="2">2주</option>
-                                        <option value="3">3주</option>
-                                        <option value="4">4주</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label style="font-size: 12px;">불가능한 요일</label>
-                                    <div class="checkbox-group" style="margin-bottom: 5px;">
-                                        <label><input type="checkbox" value="월" class="week-unavailable-${index}"> 월</label>
-                                        <label><input type="checkbox" value="화" class="week-unavailable-${index}"> 화</label>
-                                        <label><input type="checkbox" value="수" class="week-unavailable-${index}"> 수</label>
-                                        <label><input type="checkbox" value="목" class="week-unavailable-${index}"> 목</label>
-                                        <label><input type="checkbox" value="금" class="week-unavailable-${index}"> 금</label>
-                                    </div>
-                                    <label style="font-size: 12px;">2nd duty 가능</label>
-                                    <div class="checkbox-group">
-                                        <label><input type="checkbox" value="월" class="week-alternative-${index}"> 월</label>
-                                        <label><input type="checkbox" value="화" class="week-alternative-${index}"> 화</label>
-                                        <label><input type="checkbox" value="수" class="week-alternative-${index}"> 수</label>
-                                        <label><input type="checkbox" value="목" class="week-alternative-${index}"> 목</label>
-                                        <label><input type="checkbox" value="금" class="week-alternative-${index}"> 금</label>
-                                    </div>
-                                </div>
-                            </div>
-                            <button onclick="addWeeklyRestriction(${index})" style="padding: 6px 12px; font-size: 13px; margin-top: 5px;">주별 제약 추가</button>
-                        </div>
+                html += '<div class="vacation-form" style="background: #e8f4f8;">';
+                html += '<label style="font-size: 13px; margin-bottom: 5px;">주별 제약 추가</label>';
+                html += '<div style="display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start;">';
+                html += '<div>';
+                html += '<label style="font-size: 12px;">주차</label>';
+                html += '<select id="weekNum_' + index + '" style="width: 60px; padding: 5px; font-size: 13px;">';
+                html += '<option value="1">1주</option>';
+                html += '<option value="2">2주</option>';
+                html += '<option value="3">3주</option>';
+                html += '<option value="4">4주</option>';
+                html += '</select>';
+                html += '</div>';
+                html += '<div>';
+                html += '<label style="font-size: 12px;">불가능한 요일</label>';
+                html += '<div class="checkbox-group" style="margin-bottom: 5px;">';
+                html += '<label><input type="checkbox" value="월" class="week-unavailable-' + index + '"> 월</label>';
+                html += '<label><input type="checkbox" value="화" class="week-unavailable-' + index + '"> 화</label>';
+                html += '<label><input type="checkbox" value="수" class="week-unavailable-' + index + '"> 수</label>';
+                html += '<label><input type="checkbox" value="목" class="week-unavailable-' + index + '"> 목</label>';
+                html += '<label><input type="checkbox" value="금" class="week-unavailable-' + index + '"> 금</label>';
+                html += '</div>';
+                html += '<label style="font-size: 12px;">2nd duty 가능</label>';
+                html += '<div class="checkbox-group">';
+                html += '<label><input type="checkbox" value="월" class="week-alternative-' + index + '"> 월</label>';
+                html += '<label><input type="checkbox" value="화" class="week-alternative-' + index + '"> 화</label>';
+                html += '<label><input type="checkbox" value="수" class="week-alternative-' + index + '"> 수</label>';
+                html += '<label><input type="checkbox" value="목" class="week-alternative-' + index + '"> 목</label>';
+                html += '<label><input type="checkbox" value="금" class="week-alternative-' + index + '"> 금</label>';
+                html += '</div>';
+                html += '</div>';
+                html += '</div>';
+                html += '<button onclick="addWeeklyRestriction(' + index + ')" style="padding: 6px 12px; font-size: 13px; margin-top: 5px;">주별 제약 추가</button>';
+                html += '</div>';
 
-                        <div class="vacation-form">
-                            <label style="font-size: 13px; margin-bottom: 5px;">휴가 추가</label>
-                            <div class="day-range-input">
-                                <input type="number" id="vacStart_${index}" min="1" max="20" placeholder="시작일">
-                                <span>~</span>
-                                <input type="number" id="vacEnd_${index}" min="1" max="20" placeholder="종료일">
-                            </div>
-                            <button onclick="addVacation(${index})" style="padding: 6px 12px; font-size: 13px; margin-top: 5px;">휴가 추가</button>
-                        </div>
+                html += '<div class="vacation-form">';
+                html += '<label style="font-size: 13px; margin-bottom: 5px;">휴가 추가</label>';
+                html += '<div class="day-range-input">';
+                html += '<input type="number" id="vacStart_' + index + '" min="1" max="20" placeholder="시작일">';
+                html += '<span>~</span>';
+                html += '<input type="number" id="vacEnd_' + index + '" min="1" max="20" placeholder="종료일">';
+                html += '</div>';
+                html += '<button onclick="addVacation(' + index + ')" style="padding: 6px 12px; font-size: 13px; margin-top: 5px;">휴가 추가</button>';
+                html += '</div>';
 
-                        <div class="vacation-form" style="background: #fff3e6;">
-                            <label style="font-size: 13px; margin-bottom: 5px;">선호 당직 날짜 추가</label>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                                <div>
-                                    <label style="font-size: 12px; margin: 3px 0;">날짜 (Day)</label>
-                                    <input type="number" id="prefDay_${index}" min="1" max="20" placeholder="1-20" style="width: 100%; padding: 5px;">
-                                </div>
-                                <div>
-                                    <label style="font-size: 12px; margin: 3px 0;">유형</label>
-                                    <select id="prefType_${index}" style="width: 100%; padding: 5px;">
-                                        <option value="any">당직/2nd</option>
-                                        <option value="primary">당직만</option>
-                                        <option value="secondary">2nd만</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <button onclick="addPreferredDuty(${index})" style="padding: 6px 12px; font-size: 13px; margin-top: 5px;">선호 날짜 추가</button>
-                        </div>
+                html += '<div class="vacation-form" style="background: #fff3e6;">';
+                html += '<label style="font-size: 13px; margin-bottom: 5px;">선호 당직 날짜 추가</label>';
+                html += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">';
+                html += '<div>';
+                html += '<label style="font-size: 12px; margin: 3px 0;">날짜 (Day)</label>';
+                html += '<input type="number" id="prefDay_' + index + '" min="1" max="20" placeholder="1-20" style="width: 100%; padding: 5px;">';
+                html += '</div>';
+                html += '<div>';
+                html += '<label style="font-size: 12px; margin: 3px 0;">유형</label>';
+                html += '<select id="prefType_' + index + '" style="width: 100%; padding: 5px;">';
+                html += '<option value="any">당직/2nd</option>';
+                html += '<option value="primary">당직만</option>';
+                html += '<option value="secondary">2nd만</option>';
+                html += '</select>';
+                html += '</div>';
+                html += '</div>';
+                html += '<button onclick="addPreferredDuty(' + index + ')" style="padding: 6px 12px; font-size: 13px; margin-top: 5px;">선호 날짜 추가</button>';
+                html += '</div>';
 
-                        <button onclick="removePerson(${index})" class="danger" style="padding: 6px 12px; font-size: 14px; margin-top: 10px;">인원 삭제</button>
-                    </div>
-                `;
+                html += '<button onclick="removePerson(' + index + ')" class="danger" style="padding: 6px 12px; font-size: 14px; margin-top: 10px;">인원 삭제</button>';
+                html += '</div>';
             });
             listDiv.innerHTML = html;
         }

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Delete Button</title>
+</head>
+<body>
+    <h1>Delete Button Test</h1>
+    <div id="list"></div>
+
+    <script>
+        let items = ['Item 1', 'Item 2', 'Item 3'];
+
+        function removeItem(index) {
+            console.log('removeItem called with index:', index);
+            alert('Removing: ' + items[index]);
+            items.splice(index, 1);
+            render();
+        }
+
+        function render() {
+            const listDiv = document.getElementById('list');
+            let html = '';
+            items.forEach((item, index) => {
+                html += `
+                    <div>
+                        <span>${item}</span>
+                        <button onclick="removeItem(${index})">삭제</button>
+                    </div>
+                `;
+            });
+            listDiv.innerHTML = html;
+        }
+
+        render();
+    </script>
+</body>
+</html>
