@@ -892,7 +892,6 @@
                 showMessage('인원이 삭제되었습니다.', 'info');
             }
         }
-        window.removePerson = removePerson;
 
         // Clear all data
         function clearAllData() {
@@ -931,7 +930,7 @@
                     person.vacations.forEach((vacation, vIdx) => {
                         vacationHTML += '<div class="vacation-item">';
                         vacationHTML += '<span>🏖️ Day ' + vacation.start + ' ~ ' + vacation.end + '</span>';
-                        vacationHTML += '<button onclick="removeVacation(' + index + ', ' + vIdx + ')" class="danger" style="padding: 3px 8px; font-size: 12px;">삭제</button>';
+                        vacationHTML += '<button class="danger btn-delete-vacation" data-person-index="' + index + '" data-vacation-index="' + vIdx + '" style="padding: 3px 8px; font-size: 12px;">삭제</button>';
                         vacationHTML += '</div>';
                     });
                     vacationHTML += '</div>';
@@ -949,7 +948,7 @@
                             ? ', 2nd 가능: ' + restriction.alternative.join(', ') : '';
                         weeklyHTML += '<div class="vacation-item">';
                         weeklyHTML += '<span>📅 ' + weekNum + '주차: ' + unavailText + altText + '</span>';
-                        weeklyHTML += '<button onclick="removeWeeklyRestriction(' + index + ', ' + weekNum + ')" class="danger" style="padding: 3px 8px; font-size: 12px;">삭제</button>';
+                        weeklyHTML += '<button class="danger btn-delete-weekly" data-person-index="' + index + '" data-week-num="' + weekNum + '" style="padding: 3px 8px; font-size: 12px;">삭제</button>';
                         weeklyHTML += '</div>';
                     });
                     weeklyHTML += '</div>';
@@ -966,7 +965,7 @@
                         else typeText = '당직/2nd';
                         preferredHTML += '<div class="vacation-item">';
                         preferredHTML += '<span>⭐ Day ' + pref.day + ': ' + typeText + '</span>';
-                        preferredHTML += '<button onclick="removePreferredDuty(' + index + ', ' + pIdx + ')" class="danger" style="padding: 3px 8px; font-size: 12px;">삭제</button>';
+                        preferredHTML += '<button class="danger btn-delete-preferred" data-person-index="' + index + '" data-preferred-index="' + pIdx + '" style="padding: 3px 8px; font-size: 12px;">삭제</button>';
                         preferredHTML += '</div>';
                     });
                     preferredHTML += '</div>';
@@ -1072,10 +1071,50 @@
                 html += '<button onclick="addPreferredDuty(' + index + ')" style="padding: 6px 12px; font-size: 13px; margin-top: 5px;">선호 날짜 추가</button>';
                 html += '</div>';
 
-                html += '<button onclick="removePerson(' + index + ')" class="danger" style="padding: 6px 12px; font-size: 14px; margin-top: 10px;">인원 삭제</button>';
+                html += '<button class="danger btn-delete-person" data-person-index="' + index + '" style="padding: 6px 12px; font-size: 14px; margin-top: 10px;">인원 삭제</button>';
                 html += '</div>';
             });
             listDiv.innerHTML = html;
+
+            // Add event listeners for delete buttons
+            // Vacation delete buttons
+            document.querySelectorAll('.btn-delete-vacation').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const personIndex = parseInt(this.getAttribute('data-person-index'));
+                    const vacationIndex = parseInt(this.getAttribute('data-vacation-index'));
+                    console.log('Delete vacation clicked:', personIndex, vacationIndex);
+                    removeVacation(personIndex, vacationIndex);
+                });
+            });
+
+            // Weekly restriction delete buttons
+            document.querySelectorAll('.btn-delete-weekly').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const personIndex = parseInt(this.getAttribute('data-person-index'));
+                    const weekNum = this.getAttribute('data-week-num');
+                    console.log('Delete weekly clicked:', personIndex, weekNum);
+                    removeWeeklyRestriction(personIndex, weekNum);
+                });
+            });
+
+            // Preferred duty delete buttons
+            document.querySelectorAll('.btn-delete-preferred').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const personIndex = parseInt(this.getAttribute('data-person-index'));
+                    const preferredIndex = parseInt(this.getAttribute('data-preferred-index'));
+                    console.log('Delete preferred clicked:', personIndex, preferredIndex);
+                    removePreferredDuty(personIndex, preferredIndex);
+                });
+            });
+
+            // Person delete buttons
+            document.querySelectorAll('.btn-delete-person').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const personIndex = parseInt(this.getAttribute('data-person-index'));
+                    console.log('Delete person clicked:', personIndex);
+                    removePerson(personIndex);
+                });
+            });
         }
 
         // Add weekly restriction
@@ -1155,7 +1194,6 @@
                 showMessage('휴가가 삭제되었습니다.', 'success');
             }
         }
-        window.removeVacation = removeVacation;
 
         // Add preferred duty day
         function addPreferredDuty(personIndex) {
@@ -1998,26 +2036,7 @@
             showMessage(`${person.name}님의 정보가 수정되었습니다.`, 'success');
         }
 
-        // Expose all functions to global scope for onclick handlers
-        window.removeWeeklyRestriction = removeWeeklyRestriction;
-        window.removePreferredDuty = removePreferredDuty;
-        window.addVacation = addVacation;
-        window.addWeeklyRestriction = addWeeklyRestriction;
-        window.addPreferredDuty = addPreferredDuty;
-        window.toggleEditMode = toggleEditMode;
-        window.savePersonEdit = savePersonEdit;
-
-        console.log('All functions exposed to window:', {
-            removePerson: typeof window.removePerson,
-            removeVacation: typeof window.removeVacation,
-            removeWeeklyRestriction: typeof window.removeWeeklyRestriction,
-            removePreferredDuty: typeof window.removePreferredDuty,
-            addVacation: typeof window.addVacation,
-            addWeeklyRestriction: typeof window.addWeeklyRestriction,
-            addPreferredDuty: typeof window.addPreferredDuty,
-            toggleEditMode: typeof window.toggleEditMode,
-            savePersonEdit: typeof window.savePersonEdit
-        });
+        console.log('병원 당직표 생성기 로드 완료 - 이벤트 리스너 방식 사용');
     </script>
 </body>
 </html>
