@@ -1036,7 +1036,7 @@ title: 병원 당직표 생성기
             renderCalendar();
         }
 
-        // Save edit
+        // Save edit with validation
         function saveEdit(dayIndex) {
             const primarySelect = document.getElementById(`editPrimary_${dayIndex}`);
             const secondarySelect = document.getElementById(`editSecondary_${dayIndex}`);
@@ -1045,7 +1045,7 @@ title: 병원 당직표 생성기
             const newSecondary = secondarySelect.value;
 
             if (newPrimary === newSecondary) {
-                showMessage('당직과 2nd duty는 같은 사람일 수 없습니다.', 'error');
+                showMessage('❌ 당직과 2nd duty는 같은 사람일 수 없습니다.', 'error');
                 return;
             }
 
@@ -1053,18 +1053,129 @@ title: 병원 당직표 생성기
             const oldPrimary = day.primary;
             const oldSecondary = day.secondary;
 
-            // Update schedule
+            // Get person objects
+            const primaryPerson = people.find(p => p.name === newPrimary);
+            const secondaryPerson = people.find(p => p.name === newSecondary);
+
+            // Validation warnings
+            const warnings = [];
+
+            // Validate primary duty assignment
+            if (primaryPerson) {
+                // Check if person is 2nd duty only
+                if (primaryPerson.secondDutyPref === '2nd-only') {
+                    warnings.push(`⚠️ ${newPrimary}님은 "2nd duty만" 가능한 설정입니다. 일반 당직에 배정할 수 없습니다.`);
+                }
+
+                // Check vacation
+                if (primaryPerson.isOnVacation(day.day)) {
+                    warnings.push(`⚠️ ${newPrimary}님은 Day ${day.day}에 휴가 중입니다.`);
+                }
+
+                // Check if primary duty is possible
+                if (!primaryPerson.canDoPrimaryDuty(day.dayOfWeek, day.day, day.week)) {
+                    // Check if it's due to weekly restriction
+                    if (primaryPerson.weeklyRestrictions && primaryPerson.weeklyRestrictions[day.week]) {
+                        const weekRestriction = primaryPerson.weeklyRestrictions[day.week];
+                        if (weekRestriction.unavailable && weekRestriction.unavailable.includes(day.dayOfWeek)) {
+                            const canDo2nd = weekRestriction.alternative && weekRestriction.alternative.includes(day.dayOfWeek);
+                            const altText = canDo2nd ? ` (${day.dayOfWeek}요일은 2nd duty로만 가능합니다)` : '';
+                            warnings.push(`⚠️ ${newPrimary}님은 ${day.week}주차 ${day.dayOfWeek}요일에 일반 당직을 할 수 없습니다.${altText}`);
+                        }
+                    }
+                    // Check general unavailable days
+                    else if (primaryPerson.unavailableDays.includes(day.dayOfWeek)) {
+                        const canDo2nd = primaryPerson.alternativeDays.includes(day.dayOfWeek);
+                        const altText = canDo2nd ? ` (${day.dayOfWeek}요일은 2nd duty로만 가능합니다)` : '';
+                        warnings.push(`⚠️ ${newPrimary}님은 ${day.dayOfWeek}요일에 일반 당직을 할 수 없습니다.${altText}`);
+                    }
+                }
+
+                // Check consecutive duties
+                if (isConsecutive(schedule, newPrimary, dayIndex)) {
+                    warnings.push(`⚠️ ${newPrimary}님은 연속 당직이 됩니다. (Day ${dayIndex}와 인접)`);
+                }
+            }
+
+            // Validate secondary duty assignment
+            if (secondaryPerson) {
+                // Check vacation
+                if (secondaryPerson.isOnVacation(day.day)) {
+                    warnings.push(`⚠️ ${newSecondary}님은 Day ${day.day}에 휴가 중입니다.`);
+                }
+
+                // Check if secondary duty is possible
+                if (!secondaryPerson.canDoSecondaryDuty(day.dayOfWeek, day.day, day.week)) {
+                    // Check if it's due to weekly restriction
+                    if (secondaryPerson.weeklyRestrictions && secondaryPerson.weeklyRestrictions[day.week]) {
+                        const weekRestriction = secondaryPerson.weeklyRestrictions[day.week];
+                        if (weekRestriction.unavailable && weekRestriction.unavailable.includes(day.dayOfWeek)) {
+                            warnings.push(`⚠️ ${newSecondary}님은 ${day.week}주차 ${day.dayOfWeek}요일에 2nd duty를 할 수 없습니다.`);
+                        }
+                    }
+                    // Check general unavailable days
+                    else if (secondaryPerson.unavailableDays.includes(day.dayOfWeek)) {
+                        if (!secondaryPerson.alternativeDays.includes(day.dayOfWeek)) {
+                            warnings.push(`⚠️ ${newSecondary}님은 ${day.dayOfWeek}요일에 2nd duty를 할 수 없습니다. (대체 불가)`);
+                        }
+                    }
+                }
+
+                // Check consecutive duties
+                if (isConsecutive(schedule, newSecondary, dayIndex)) {
+                    warnings.push(`⚠️ ${newSecondary}님은 연속 당직이 됩니다. (Day ${dayIndex}와 인접)`);
+                }
+            }
+
+            // Temporarily update to check duty counts
+            const tempOldPrimary = day.primary;
+            const tempOldSecondary = day.secondary;
             day.primary = newPrimary;
             day.secondary = newSecondary;
-            day.manuallyEdited = true;
-
-            // Recalculate counts
             recalculateCounts();
+
+            // Check max duty violations
+            if (primaryPerson) {
+                const totalDuties = primaryPerson.primaryCount + primaryPerson.secondaryCount;
+                if (primaryPerson.secondDutyPref !== 'preferred' && totalDuties > primaryPerson.maxDuties) {
+                    warnings.push(`⚠️ ${newPrimary}님의 당직 횟수가 최대치(${primaryPerson.maxDuties}회)를 초과합니다. (현재: ${totalDuties}회)`);
+                }
+            }
+
+            if (secondaryPerson) {
+                if (secondaryPerson.secondDutyPref === 'limited' && secondaryPerson.secondaryCount > 1) {
+                    warnings.push(`⚠️ ${newSecondary}님은 2nd duty를 1회만 할 수 있습니다. (현재: ${secondaryPerson.secondaryCount}회)`);
+                } else if (secondaryPerson.secondDutyPref === '2nd-only' && secondaryPerson.secondaryCount > secondaryPerson.maxDuties) {
+                    warnings.push(`⚠️ ${newSecondary}님의 2nd duty 횟수가 최대치(${secondaryPerson.maxDuties}회)를 초과합니다. (현재: ${secondaryPerson.secondaryCount}회)`);
+                } else if (secondaryPerson.secondDutyPref !== 'preferred' && secondaryPerson.secondDutyPref !== '2nd-only') {
+                    const totalDuties = secondaryPerson.primaryCount + secondaryPerson.secondaryCount;
+                    if (totalDuties > secondaryPerson.maxDuties) {
+                        warnings.push(`⚠️ ${newSecondary}님의 당직 횟수가 최대치(${secondaryPerson.maxDuties}회)를 초과합니다. (현재: ${totalDuties}회)`);
+                    }
+                }
+            }
+
+            // If there are warnings, show them and ask for confirmation
+            if (warnings.length > 0) {
+                const warningMessage = warnings.join('\n\n');
+                const confirmMessage = warningMessage + '\n\n계속 진행하시겠습니까?';
+
+                if (!confirm(confirmMessage)) {
+                    // Revert changes
+                    day.primary = tempOldPrimary;
+                    day.secondary = tempOldSecondary;
+                    recalculateCounts();
+                    return;
+                }
+            }
+
+            // Mark as manually edited
+            day.manuallyEdited = true;
 
             editingDayIndex = null;
             renderCalendar();
             renderStatistics();
-            showMessage(`Day ${day.day} 당직이 변경되었습니다.`, 'success');
+            showMessage(`✅ Day ${day.day} 당직이 변경되었습니다.`, 'success');
         }
 
         // Recalculate duty counts
