@@ -700,6 +700,7 @@
 
         // Load sample data
         function loadSampleData() {
+            console.log('=== 예시 데이터 로드 시작 ===');
             // Create person with weekly restriction example
             const kimNayoung = new Person('김나영', ['화', '목', '금'], [], 3, 'normal', [], {}, []);
             kimNayoung.addWeeklyRestriction(1, ['월', '수'], []);  // 1주차: 월, 수 불가
@@ -719,8 +720,11 @@
                 new Person('백지원', [], [], 5, 'limited', [], {}, []),
                 new Person('박수정', ['금', '월'], ['금'], 5, 'normal', [{start: 5, end: 12}], {}, [])
             ];
+            console.log('예시 데이터 생성됨, people.length:', people.length);
+            console.log('renderPersonList() 호출 중...');
             renderPersonList();
             showMessage('예시 데이터가 로드되었습니다. (김나영: 1주차 월/수, 2주차 목/금 불가)', 'success');
+            console.log('=== 예시 데이터 로드 완료 ===');
         }
 
         // Add person
@@ -884,12 +888,19 @@
 
         // Remove person
         function removePerson(index) {
-            console.log('removePerson called with index:', index);
+            console.log('>>> removePerson 함수 호출됨! index:', index);
+            console.log('>>> people 배열:', people);
+            console.log('>>> people[index]:', people[index]);
             const person = people[index];
+            console.log('>>> confirm 대화상자 표시 중...');
             if (confirm(person.name + ' 님을 삭제하시겠습니까?')) {
+                console.log('>>> 사용자가 삭제 확인함');
                 people.splice(index, 1);
+                console.log('>>> splice 완료, 새로운 people:', people);
                 renderPersonList();
                 showMessage('인원이 삭제되었습니다.', 'info');
+            } else {
+                console.log('>>> 사용자가 삭제 취소함');
             }
         }
 
@@ -1076,45 +1087,58 @@
             });
             listDiv.innerHTML = html;
 
+            console.log('=== renderPersonList: 이벤트 리스너 부착 시작 ===');
+
             // Add event listeners for delete buttons
             // Vacation delete buttons
-            document.querySelectorAll('.btn-delete-vacation').forEach(btn => {
+            const vacationButtons = document.querySelectorAll('.btn-delete-vacation');
+            console.log('휴가 삭제 버튼 개수:', vacationButtons.length);
+            vacationButtons.forEach((btn, idx) => {
+                console.log('휴가 버튼', idx, '에 리스너 부착 중...');
                 btn.addEventListener('click', function() {
                     const personIndex = parseInt(this.getAttribute('data-person-index'));
                     const vacationIndex = parseInt(this.getAttribute('data-vacation-index'));
-                    console.log('Delete vacation clicked:', personIndex, vacationIndex);
+                    console.log('!!! 휴가 삭제 버튼 클릭됨 !!!', personIndex, vacationIndex);
                     removeVacation(personIndex, vacationIndex);
                 });
             });
 
             // Weekly restriction delete buttons
-            document.querySelectorAll('.btn-delete-weekly').forEach(btn => {
+            const weeklyButtons = document.querySelectorAll('.btn-delete-weekly');
+            console.log('주별 제약 삭제 버튼 개수:', weeklyButtons.length);
+            weeklyButtons.forEach(btn => {
                 btn.addEventListener('click', function() {
                     const personIndex = parseInt(this.getAttribute('data-person-index'));
                     const weekNum = this.getAttribute('data-week-num');
-                    console.log('Delete weekly clicked:', personIndex, weekNum);
+                    console.log('!!! 주별 제약 삭제 버튼 클릭됨 !!!', personIndex, weekNum);
                     removeWeeklyRestriction(personIndex, weekNum);
                 });
             });
 
             // Preferred duty delete buttons
-            document.querySelectorAll('.btn-delete-preferred').forEach(btn => {
+            const preferredButtons = document.querySelectorAll('.btn-delete-preferred');
+            console.log('선호 날짜 삭제 버튼 개수:', preferredButtons.length);
+            preferredButtons.forEach(btn => {
                 btn.addEventListener('click', function() {
                     const personIndex = parseInt(this.getAttribute('data-person-index'));
                     const preferredIndex = parseInt(this.getAttribute('data-preferred-index'));
-                    console.log('Delete preferred clicked:', personIndex, preferredIndex);
+                    console.log('!!! 선호 날짜 삭제 버튼 클릭됨 !!!', personIndex, preferredIndex);
                     removePreferredDuty(personIndex, preferredIndex);
                 });
             });
 
             // Person delete buttons
-            document.querySelectorAll('.btn-delete-person').forEach(btn => {
+            const personButtons = document.querySelectorAll('.btn-delete-person');
+            console.log('인원 삭제 버튼 개수:', personButtons.length);
+            personButtons.forEach(btn => {
                 btn.addEventListener('click', function() {
                     const personIndex = parseInt(this.getAttribute('data-person-index'));
-                    console.log('Delete person clicked:', personIndex);
+                    console.log('!!! 인원 삭제 버튼 클릭됨 !!!', personIndex);
                     removePerson(personIndex);
                 });
             });
+
+            console.log('=== 이벤트 리스너 부착 완료 ===');
         }
 
         // Add weekly restriction
@@ -1180,18 +1204,27 @@
 
         // Remove vacation
         function removeVacation(personIndex, vacationIndex) {
-            console.log('removeVacation called:', personIndex, vacationIndex);
+            console.log('>>> removeVacation 함수 호출됨!', 'personIndex:', personIndex, 'vacationIndex:', vacationIndex);
+            console.log('>>> people 배열:', people);
             const person = people[personIndex];
+            console.log('>>> person:', person);
             if (!person || !person.vacations || !person.vacations[vacationIndex]) {
+                console.log('>>> 오류: 휴가를 찾을 수 없음');
                 showMessage('삭제 오류: 휴가를 찾을 수 없습니다.', 'error');
                 return;
             }
 
             const vacation = person.vacations[vacationIndex];
+            console.log('>>> vacation:', vacation);
+            console.log('>>> confirm 대화상자 표시 중...');
             if (confirm(person.name + '의 휴가 (Day ' + vacation.start + ' ~ ' + vacation.end + ')를 삭제하시겠습니까?')) {
+                console.log('>>> 사용자가 삭제 확인함');
                 person.vacations.splice(vacationIndex, 1);
+                console.log('>>> splice 완료, 새로운 vacations:', person.vacations);
                 renderPersonList();
                 showMessage('휴가가 삭제되었습니다.', 'success');
+            } else {
+                console.log('>>> 사용자가 삭제 취소함');
             }
         }
 
