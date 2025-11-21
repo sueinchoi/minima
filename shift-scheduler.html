@@ -1288,7 +1288,7 @@ title: 병원 당직표 생성기
                         vacationHTML += `
                             <div class="vacation-item">
                                 <span>🏖️ Day ${vacation.start} ~ ${vacation.end}</span>
-                                <button class="danger btn-remove-vacation" data-person-index="${index}" data-vacation-index="${vIdx}" style="padding: 3px 8px; font-size: 12px;">삭제</button>
+                                <button onclick="removeVacation(${index}, ${vIdx})" class="danger" style="padding: 3px 8px; font-size: 12px;">삭제</button>
                             </div>
                         `;
                     });
@@ -1308,7 +1308,7 @@ title: 병원 당직표 생성기
                         weeklyHTML += `
                             <div class="vacation-item">
                                 <span>📅 ${weekNum}주차: ${unavailText}${altText}</span>
-                                <button class="danger btn-remove-weekly" data-person-index="${index}" data-week-num="${weekNum}" style="padding: 3px 8px; font-size: 12px;">삭제</button>
+                                <button onclick="removeWeeklyRestriction(${index}, ${weekNum})" class="danger" style="padding: 3px 8px; font-size: 12px;">삭제</button>
                             </div>
                         `;
                     });
@@ -1327,7 +1327,7 @@ title: 병원 당직표 생성기
                         preferredHTML += `
                             <div class="vacation-item">
                                 <span>⭐ Day ${pref.day}: ${typeText}</span>
-                                <button class="danger btn-remove-preferred" data-person-index="${index}" data-preferred-index="${pIdx}" style="padding: 3px 8px; font-size: 12px;">삭제</button>
+                                <button onclick="removePreferredDuty(${index}, ${pIdx})" class="danger" style="padding: 3px 8px; font-size: 12px;">삭제</button>
                             </div>
                         `;
                     });
@@ -1338,7 +1338,7 @@ title: 병원 당직표 생성기
                     <div class="person-entry" id="person_${index}">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <h3 style="margin: 0;">${person.name}${badge}</h3>
-                            <button class="secondary btn-toggle-edit" data-person-index="${index}" style="padding: 5px 10px; font-size: 12px;">⚙️ 정보 수정</button>
+                            <button onclick="toggleEditMode(${index})" class="secondary" style="padding: 5px 10px; font-size: 12px;">⚙️ 정보 수정</button>
                         </div>
 
                         <p class="small-text" style="margin-top: 10px;">
@@ -1364,8 +1364,8 @@ title: 병원 당직표 생성기
                                     </select>
                                 </div>
                             </div>
-                            <button class="btn-save-edit" data-person-index="${index}" style="background: #27ae60; margin-top: 8px;">✓ 저장</button>
-                            <button class="secondary btn-cancel-edit" data-person-index="${index}" style="margin-top: 8px;">취소</button>
+                            <button onclick="savePersonEdit(${index})" style="background: #27ae60; margin-top: 8px;">✓ 저장</button>
+                            <button onclick="toggleEditMode(${index})" class="secondary" style="margin-top: 8px;">취소</button>
                         </div>
 
                         ${weeklyHTML}
@@ -1403,7 +1403,7 @@ title: 병원 당직표 생성기
                                     </div>
                                 </div>
                             </div>
-                            <button class="btn-add-weekly" data-person-index="${index}" style="padding: 6px 12px; font-size: 13px; margin-top: 5px;">주별 제약 추가</button>
+                            <button onclick="addWeeklyRestriction(${index})" style="padding: 6px 12px; font-size: 13px; margin-top: 5px;">주별 제약 추가</button>
                         </div>
 
                         <div class="vacation-form">
@@ -1413,7 +1413,7 @@ title: 병원 당직표 생성기
                                 <span>~</span>
                                 <input type="number" id="vacEnd_${index}" min="1" max="20" placeholder="종료일">
                             </div>
-                            <button class="btn-add-vacation" data-person-index="${index}" style="padding: 6px 12px; font-size: 13px; margin-top: 5px;">휴가 추가</button>
+                            <button onclick="addVacation(${index})" style="padding: 6px 12px; font-size: 13px; margin-top: 5px;">휴가 추가</button>
                         </div>
 
                         <div class="vacation-form" style="background: #fff3e6;">
@@ -1432,10 +1432,10 @@ title: 병원 당직표 생성기
                                     </select>
                                 </div>
                             </div>
-                            <button class="btn-add-preferred" data-person-index="${index}" style="padding: 6px 12px; font-size: 13px; margin-top: 5px;">선호 날짜 추가</button>
+                            <button onclick="addPreferredDuty(${index})" style="padding: 6px 12px; font-size: 13px; margin-top: 5px;">선호 날짜 추가</button>
                         </div>
 
-                        <button class="danger btn-remove-person" data-person-index="${index}" style="padding: 6px 12px; font-size: 14px; margin-top: 10px;">인원 삭제</button>
+                        <button onclick="removePerson(${index})" class="danger" style="padding: 6px 12px; font-size: 14px; margin-top: 10px;">인원 삭제</button>
                     </div>
                 `;
             });
@@ -2326,7 +2326,15 @@ title: 병원 당직표 생성기
         }
 
         // Initialize when DOM is ready
+        let isInitialized = false;
+
         function initializeApp() {
+            if (isInitialized) {
+                console.log('App already initialized, skipping...');
+                return;
+            }
+
+            console.log('Initializing app...');
             renderPersonList();
 
             // Event delegation for dynamically created buttons
@@ -2336,7 +2344,9 @@ title: 병원 당직표 생성기
                 return;
             }
 
+            console.log('Setting up event delegation on personList');
             personListElement.addEventListener('click', function(e) {
+                console.log('Click event detected on personList', e.target);
             // Check if clicked element or its parent is a button
             let btn = e.target.closest('button');
             if (!btn) return;
@@ -2438,6 +2448,9 @@ title: 병원 당직표 생성기
                 return;
             }
             });
+
+            isInitialized = true;
+            console.log('App initialization complete!');
         }
 
         // Call initialization
