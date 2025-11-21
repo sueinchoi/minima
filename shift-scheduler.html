@@ -365,6 +365,101 @@
             font-size: 12px;
             margin: 3px;
         }
+
+        /* 접기/펼치기 섹션 스타일 */
+        .collapsible-section {
+            margin-top: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .collapsible-header {
+            background: #f8f9fa;
+            padding: 10px 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+            transition: background 0.2s;
+        }
+
+        .collapsible-header:hover {
+            background: #e9ecef;
+        }
+
+        .collapsible-header h4 {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .collapsible-toggle {
+            font-size: 18px;
+            font-weight: bold;
+            color: #6c757d;
+            transition: transform 0.3s;
+        }
+
+        .collapsible-toggle.expanded {
+            transform: rotate(180deg);
+        }
+
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .collapsible-content.expanded {
+            max-height: 2000px;
+            transition: max-height 0.5s ease-in;
+        }
+
+        .collapsible-body {
+            padding: 15px;
+            background: white;
+        }
+
+        /* 컴팩트한 주별 제약 레이아웃 */
+        .week-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+
+        .week-item {
+            background: #f8f9fa;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .week-item strong {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 12px;
+        }
+
+        /* 간결한 폼 레이아웃 */
+        .compact-form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .compact-form-grid label {
+            font-size: 13px;
+            margin: 3px 0;
+        }
+
+        .compact-form-grid input,
+        .compact-form-grid select {
+            padding: 6px;
+            font-size: 13px;
+        }
     </style>
 </head>
 <body>
@@ -377,43 +472,60 @@
 
             <div class="add-person-form">
                 <h3>새 인원 추가</h3>
-                <label>이름</label>
-                <input type="text" id="newPersonName" placeholder="이름 입력">
 
-                <label>불가능한 요일 (당직)</label>
-                <div class="checkbox-group">
-                    <label><input type="checkbox" value="월" class="new-unavailable-day"> 월</label>
-                    <label><input type="checkbox" value="화" class="new-unavailable-day"> 화</label>
-                    <label><input type="checkbox" value="수" class="new-unavailable-day"> 수</label>
-                    <label><input type="checkbox" value="목" class="new-unavailable-day"> 목</label>
-                    <label><input type="checkbox" value="금" class="new-unavailable-day"> 금</label>
+                <div class="compact-form-grid">
+                    <div>
+                        <label>이름</label>
+                        <input type="text" id="newPersonName" placeholder="이름 입력">
+                    </div>
+                    <div>
+                        <label>최대 당직 횟수</label>
+                        <input type="number" id="newPersonMaxDuties" value="5" min="0" max="20">
+                    </div>
                 </div>
 
-                <label>대체 가능 요일 (2nd duty로 가능)</label>
-                <div class="checkbox-group">
-                    <label><input type="checkbox" value="월" class="new-alternative-day"> 월</label>
-                    <label><input type="checkbox" value="화" class="new-alternative-day"> 화</label>
-                    <label><input type="checkbox" value="수" class="new-alternative-day"> 수</label>
-                    <label><input type="checkbox" value="목" class="new-alternative-day"> 목</label>
-                    <label><input type="checkbox" value="금" class="new-alternative-day"> 금</label>
+                <div style="margin-top: 10px;">
+                    <label>2nd Duty 선호도</label>
+                    <select id="newPersonSecondDutyPref">
+                        <option value="normal">일반</option>
+                        <option value="preferred">선호 (무제한)</option>
+                        <option value="limited">제한적 (1회만)</option>
+                        <option value="2nd-only">2nd duty만</option>
+                    </select>
                 </div>
 
-                <label>최대 당직 횟수</label>
-                <input type="number" id="newPersonMaxDuties" value="5" min="0" max="20">
+                <div style="margin-top: 10px;">
+                    <label>불가능한 요일 (당직)</label>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" value="월" class="new-unavailable-day"> 월</label>
+                        <label><input type="checkbox" value="화" class="new-unavailable-day"> 화</label>
+                        <label><input type="checkbox" value="수" class="new-unavailable-day"> 수</label>
+                        <label><input type="checkbox" value="목" class="new-unavailable-day"> 목</label>
+                        <label><input type="checkbox" value="금" class="new-unavailable-day"> 금</label>
+                    </div>
+                </div>
 
-                <label>2nd Duty 선호도</label>
-                <select id="newPersonSecondDutyPref">
-                    <option value="normal">일반</option>
-                    <option value="preferred">선호 (무제한)</option>
-                    <option value="limited">제한적 (1회만)</option>
-                    <option value="2nd-only">2nd duty만</option>
-                </select>
+                <div style="margin-top: 10px;">
+                    <label>대체 가능 요일 (2nd duty로 가능)</label>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" value="월" class="new-alternative-day"> 월</label>
+                        <label><input type="checkbox" value="화" class="new-alternative-day"> 화</label>
+                        <label><input type="checkbox" value="수" class="new-alternative-day"> 수</label>
+                        <label><input type="checkbox" value="목" class="new-alternative-day"> 목</label>
+                        <label><input type="checkbox" value="금" class="new-alternative-day"> 금</label>
+                    </div>
+                </div>
 
-                <div style="margin-top: 15px; padding: 15px; background: #f0f8ff; border-radius: 5px; border-left: 3px solid #3498db;">
-                    <label style="font-size: 14px; font-weight: 600; color: #2c3e50;">📅 주별 제약 (선택사항)</label>
-                    <p class="small-text" style="margin: 5px 0 10px 0;">각 주차별로 다른 불가능한 요일을 설정할 수 있습니다.</p>
-
-                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 10px;">
+                <!-- 주별 제약 접기/펼치기 섹션 -->
+                <div class="collapsible-section">
+                    <div class="collapsible-header" onclick="toggleCollapsible('newPersonWeekly')">
+                        <h4>📅 주별 제약 (선택사항)</h4>
+                        <span class="collapsible-toggle" id="toggle-newPersonWeekly">▼</span>
+                    </div>
+                    <div class="collapsible-content" id="content-newPersonWeekly">
+                        <div class="collapsible-body">
+                            <p class="small-text" style="margin: 0 0 10px 0;">각 주차별로 다른 불가능한 요일을 설정할 수 있습니다.</p>
+                            <div class="week-grid">
                         <!-- 1주차 -->
                         <div style="background: white; padding: 10px; border-radius: 4px;">
                             <strong style="font-size: 13px; color: #e74c3c;">1주차</strong>
@@ -506,28 +618,42 @@
                             </div>
                         </div>
                     </div>
+                        </div>
+                    </div>
                 </div>
 
-                <div style="margin-top: 15px; padding: 15px; background: #fff3e6; border-radius: 5px; border-left: 3px solid #f39c12;">
-                    <label style="font-size: 14px; font-weight: 600; color: #2c3e50;">⭐ 선호 당직 날짜 (선택사항)</label>
-                    <p class="small-text" style="margin: 5px 0 10px 0;">특정 날짜에 당직 또는 2nd 당직으로 우선 배정됩니다.</p>
-
-                    <div id="newPersonPreferredDuties" style="margin-top: 10px;">
-                        <!-- Preferred duty entries will be added here -->
+                <!-- 선호 날짜 접기/펼치기 섹션 -->
+                <div class="collapsible-section">
+                    <div class="collapsible-header" onclick="toggleCollapsible('newPersonPreferred')">
+                        <h4>⭐ 선호 당직 날짜 (선택사항)</h4>
+                        <span class="collapsible-toggle" id="toggle-newPersonPreferred">▼</span>
                     </div>
-
-                    <button type="button" onclick="addNewPreferredDutyField()" style="padding: 5px 10px; font-size: 12px; margin-top: 10px; background: #f39c12; color: white; border: none; border-radius: 3px; cursor: pointer;">➕ 선호 날짜 추가</button>
+                    <div class="collapsible-content" id="content-newPersonPreferred">
+                        <div class="collapsible-body">
+                            <p class="small-text" style="margin: 0 0 10px 0;">특정 날짜에 당직 또는 2nd 당직으로 우선 배정됩니다.</p>
+                            <div id="newPersonPreferredDuties" style="margin-top: 10px;">
+                                <!-- Preferred duty entries will be added here -->
+                            </div>
+                            <button type="button" onclick="addNewPreferredDutyField()" style="padding: 5px 10px; font-size: 12px; margin-top: 10px; background: #f39c12; color: white; border: none; border-radius: 3px; cursor: pointer;">➕ 선호 날짜 추가</button>
+                        </div>
+                    </div>
                 </div>
 
-                <div style="margin-top: 15px; padding: 15px; background: #e8f5e9; border-radius: 5px; border-left: 3px solid #27ae60;">
-                    <label style="font-size: 14px; font-weight: 600; color: #2c3e50;">🏖️ 휴가 (선택사항)</label>
-                    <p class="small-text" style="margin: 5px 0 10px 0;">휴가 기간 동안은 당직 및 2nd 당직에서 제외됩니다.</p>
-
-                    <div id="newPersonVacations" style="margin-top: 10px;">
-                        <!-- Vacation entries will be added here -->
+                <!-- 휴가 접기/펼치기 섹션 -->
+                <div class="collapsible-section">
+                    <div class="collapsible-header" onclick="toggleCollapsible('newPersonVacation')">
+                        <h4>🏖️ 휴가 (선택사항)</h4>
+                        <span class="collapsible-toggle" id="toggle-newPersonVacation">▼</span>
                     </div>
-
-                    <button type="button" onclick="addNewVacationField()" style="padding: 5px 10px; font-size: 12px; margin-top: 10px; background: #27ae60; color: white; border: none; border-radius: 3px; cursor: pointer;">➕ 휴가 추가</button>
+                    <div class="collapsible-content" id="content-newPersonVacation">
+                        <div class="collapsible-body">
+                            <p class="small-text" style="margin: 0 0 10px 0;">휴가 기간 동안은 당직 및 2nd 당직에서 제외됩니다.</p>
+                            <div id="newPersonVacations" style="margin-top: 10px;">
+                                <!-- Vacation entries will be added here -->
+                            </div>
+                            <button type="button" onclick="addNewVacationField()" style="padding: 5px 10px; font-size: 12px; margin-top: 10px; background: #27ae60; color: white; border: none; border-radius: 3px; cursor: pointer;">➕ 휴가 추가</button>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="button-group">
@@ -578,6 +704,20 @@
         const DAYS_OF_WEEK = ['월', '화', '수', '목', '금'];
         const TOTAL_DAYS = 20;
         const WEEKS = 4;
+
+        // 접기/펼치기 기능
+        function toggleCollapsible(sectionId) {
+            const content = document.getElementById('content-' + sectionId);
+            const toggle = document.getElementById('toggle-' + sectionId);
+
+            if (content.classList.contains('expanded')) {
+                content.classList.remove('expanded');
+                toggle.classList.remove('expanded');
+            } else {
+                content.classList.add('expanded');
+                toggle.classList.add('expanded');
+            }
+        }
 
         // Person class
         class Person {
@@ -999,6 +1139,29 @@
                 html += '</select>';
                 html += '</div>';
                 html += '</div>';
+
+                // 불가능한 요일 (전체) 편집
+                html += '<div style="margin-top: 10px;">';
+                html += '<label style="font-size: 12px; font-weight: 600;">불가능한 요일 (전체)</label>';
+                html += '<div class="checkbox-group">';
+                ['월', '화', '수', '목', '금'].forEach(day => {
+                    const checked = person.unavailableDays.includes(day) ? ' checked' : '';
+                    html += '<label style="font-size: 12px;"><input type="checkbox" value="' + day + '" class="edit-unavailable-' + index + '"' + checked + '> ' + day + '</label>';
+                });
+                html += '</div>';
+                html += '</div>';
+
+                // 대체 가능 요일 편집
+                html += '<div style="margin-top: 8px;">';
+                html += '<label style="font-size: 12px; font-weight: 600;">대체 가능 요일 (2nd)</label>';
+                html += '<div class="checkbox-group">';
+                ['월', '화', '수', '목', '금'].forEach(day => {
+                    const checked = person.alternativeDays.includes(day) ? ' checked' : '';
+                    html += '<label style="font-size: 12px;"><input type="checkbox" value="' + day + '" class="edit-alternative-' + index + '"' + checked + '> ' + day + '</label>';
+                });
+                html += '</div>';
+                html += '</div>';
+
                 html += '<button onclick="savePersonEdit(' + index + ')" style="background: #27ae60; margin-top: 8px;">✓ 저장</button>';
                 html += '<button onclick="toggleEditMode(' + index + ')" class="secondary" style="margin-top: 8px;">취소</button>';
                 html += '</div>';
@@ -2014,6 +2177,14 @@
             const newMaxDuties = parseInt(document.getElementById(`editMaxDuties_${personIndex}`).value);
             const newSecondPref = document.getElementById(`editSecondPref_${personIndex}`).value;
 
+            // 불가능한 요일
+            const newUnavailableDays = Array.from(document.querySelectorAll(`.edit-unavailable-${personIndex}:checked`))
+                .map(cb => cb.value);
+
+            // 대체 가능 요일
+            const newAlternativeDays = Array.from(document.querySelectorAll(`.edit-alternative-${personIndex}:checked`))
+                .map(cb => cb.value);
+
             if (newMaxDuties < 1 || newMaxDuties > 20) {
                 showMessage('최대 당직 횟수는 1~20 사이여야 합니다.', 'error');
                 return;
@@ -2021,6 +2192,8 @@
 
             person.maxDuties = newMaxDuties;
             person.secondDutyPref = newSecondPref;
+            person.unavailableDays = newUnavailableDays;
+            person.alternativeDays = newAlternativeDays;
 
             renderPersonList();
             showMessage(`${person.name}님의 정보가 수정되었습니다.`, 'success');
