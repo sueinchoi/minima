@@ -1242,11 +1242,18 @@ title: 병원 당직표 생성기
 
         // Remove person
         function removePerson(index) {
+            console.log('removePerson called with index:', index, 'people length:', people.length);
             const person = people[index];
+            if (!person) {
+                console.error('Person not found at index:', index);
+                showMessage('삭제 오류: 인원을 찾을 수 없습니다.', 'error');
+                return;
+            }
             if (confirm(`${person.name} 님을 삭제하시겠습니까?`)) {
                 people.splice(index, 1);
                 renderPersonList();
                 showMessage('인원이 삭제되었습니다.', 'info');
+                console.log('Person removed. New people length:', people.length);
             }
         }
 
@@ -1462,8 +1469,15 @@ title: 병원 당직표 생성기
 
         // Remove weekly restriction
         function removeWeeklyRestriction(personIndex, weekNum) {
+            console.log('removeWeeklyRestriction called with personIndex:', personIndex, 'weekNum:', weekNum);
             const person = people[personIndex];
-            if (!person || !person.weeklyRestrictions || !person.weeklyRestrictions[weekNum]) {
+            if (!person) {
+                console.error('Person not found at index:', personIndex);
+                showMessage('삭제 오류: 인원을 찾을 수 없습니다.', 'error');
+                return;
+            }
+            if (!person.weeklyRestrictions || !person.weeklyRestrictions[weekNum]) {
+                console.error('Weekly restriction not found. Restrictions:', person.weeklyRestrictions, 'WeekNum:', weekNum);
                 showMessage('삭제 오류: 해당 주차 제약을 찾을 수 없습니다.', 'error');
                 return;
             }
@@ -1472,6 +1486,7 @@ title: 병원 당직표 생성기
                 delete person.weeklyRestrictions[weekNum];
                 renderPersonList();
                 showMessage('주별 제약이 삭제되었습니다.', 'success');
+                console.log('Weekly restriction removed for week:', weekNum);
             }
         }
 
@@ -1505,17 +1520,26 @@ title: 병원 당직표 생성기
 
         // Remove vacation
         function removeVacation(personIndex, vacationIndex) {
+            console.log('removeVacation called with personIndex:', personIndex, 'vacationIndex:', vacationIndex);
             const person = people[personIndex];
-            if (!person || !person.vacations || !person.vacations[vacationIndex]) {
+            if (!person) {
+                console.error('Person not found at index:', personIndex);
+                showMessage('삭제 오류: 인원을 찾을 수 없습니다.', 'error');
+                return;
+            }
+            if (!person.vacations || !person.vacations[vacationIndex]) {
+                console.error('Vacation not found. Vacations:', person.vacations, 'Index:', vacationIndex);
                 showMessage('삭제 오류: 휴가를 찾을 수 없습니다.', 'error');
                 return;
             }
 
             const vacation = person.vacations[vacationIndex];
+            console.log('Vacation to remove:', vacation);
             if (confirm(`${person.name}의 휴가 (Day ${vacation.start} ~ ${vacation.end})를 삭제하시겠습니까?`)) {
                 person.vacations.splice(vacationIndex, 1);
                 renderPersonList();
                 showMessage('휴가가 삭제되었습니다.', 'success');
+                console.log('Vacation removed. Remaining vacations:', person.vacations.length);
             }
         }
 
@@ -1541,18 +1565,27 @@ title: 병원 당직표 생성기
 
         // Remove preferred duty day
         function removePreferredDuty(personIndex, preferredIndex) {
+            console.log('removePreferredDuty called with personIndex:', personIndex, 'preferredIndex:', preferredIndex);
             const person = people[personIndex];
-            if (!person || !person.preferredDutyDays || !person.preferredDutyDays[preferredIndex]) {
+            if (!person) {
+                console.error('Person not found at index:', personIndex);
+                showMessage('삭제 오류: 인원을 찾을 수 없습니다.', 'error');
+                return;
+            }
+            if (!person.preferredDutyDays || !person.preferredDutyDays[preferredIndex]) {
+                console.error('Preferred duty not found. PreferredDutyDays:', person.preferredDutyDays, 'Index:', preferredIndex);
                 showMessage('삭제 오류: 선호 당직 날짜를 찾을 수 없습니다.', 'error');
                 return;
             }
 
             const pref = person.preferredDutyDays[preferredIndex];
             let typeText = pref.type === 'primary' ? '당직' : pref.type === 'secondary' ? '2nd duty' : '당직/2nd';
+            console.log('Preferred duty to remove:', pref);
             if (confirm(`${person.name}의 선호 당직 (Day ${pref.day}: ${typeText})을 삭제하시겠습니까?`)) {
                 person.preferredDutyDays.splice(preferredIndex, 1);
                 renderPersonList();
                 showMessage('선호 당직 날짜가 삭제되었습니다.', 'success');
+                console.log('Preferred duty removed. Remaining:', person.preferredDutyDays.length);
             }
         }
 
@@ -2269,12 +2302,23 @@ title: 병원 당직표 생성기
         renderPersonList();
 
         // Event delegation for dynamically created buttons
-        document.getElementById('personList').addEventListener('click', function(e) {
+        const personListEl = document.getElementById('personList');
+        if (!personListEl) {
+            console.error('personList element not found!');
+            return;
+        }
+
+        console.log('Event listener registered on personList element');
+
+        personListEl.addEventListener('click', function(e) {
             // Check if clicked element or its parent is a button
-            let btn = e.target.closest('button');
+            const btn = e.target.closest('button');
             if (!btn) return;
 
-            console.log('Button clicked:', btn.className);
+            // Check if the button is actually inside personList
+            if (!personListEl.contains(btn)) return;
+
+            console.log('Button clicked:', btn.className, 'Classes:', Array.from(btn.classList).join(', '));
 
             // Remove vacation button
             if (btn.classList.contains('btn-remove-vacation')) {
@@ -2282,7 +2326,11 @@ title: 병원 당직표 생성기
                 e.stopPropagation();
                 const personIndex = parseInt(btn.getAttribute('data-person-index'));
                 const vacationIndex = parseInt(btn.getAttribute('data-vacation-index'));
-                console.log('Remove vacation:', personIndex, vacationIndex);
+                console.log('btn-remove-vacation clicked. personIndex:', personIndex, 'vacationIndex:', vacationIndex);
+                if (isNaN(personIndex) || isNaN(vacationIndex)) {
+                    console.error('Invalid data attributes. personIndex:', personIndex, 'vacationIndex:', vacationIndex);
+                    return;
+                }
                 removeVacation(personIndex, vacationIndex);
                 return;
             }
@@ -2293,6 +2341,11 @@ title: 병원 당직표 생성기
                 e.stopPropagation();
                 const personIndex = parseInt(btn.getAttribute('data-person-index'));
                 const weekNum = btn.getAttribute('data-week-num');
+                console.log('btn-remove-weekly clicked. personIndex:', personIndex, 'weekNum:', weekNum);
+                if (isNaN(personIndex) || !weekNum) {
+                    console.error('Invalid data attributes. personIndex:', personIndex, 'weekNum:', weekNum);
+                    return;
+                }
                 removeWeeklyRestriction(personIndex, weekNum);
                 return;
             }
@@ -2302,7 +2355,11 @@ title: 병원 당직표 생성기
                 e.preventDefault();
                 e.stopPropagation();
                 const personIndex = parseInt(btn.getAttribute('data-person-index'));
-                console.log('Remove person:', personIndex);
+                console.log('btn-remove-person clicked. personIndex:', personIndex);
+                if (isNaN(personIndex)) {
+                    console.error('Invalid data attribute. personIndex:', personIndex);
+                    return;
+                }
                 removePerson(personIndex);
                 return;
             }
@@ -2340,6 +2397,11 @@ title: 병원 당직표 생성기
                 e.stopPropagation();
                 const personIndex = parseInt(btn.getAttribute('data-person-index'));
                 const preferredIndex = parseInt(btn.getAttribute('data-preferred-index'));
+                console.log('btn-remove-preferred clicked. personIndex:', personIndex, 'preferredIndex:', preferredIndex);
+                if (isNaN(personIndex) || isNaN(preferredIndex)) {
+                    console.error('Invalid data attributes. personIndex:', personIndex, 'preferredIndex:', preferredIndex);
+                    return;
+                }
                 removePreferredDuty(personIndex, preferredIndex);
                 return;
             }
