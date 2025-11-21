@@ -884,13 +884,15 @@
 
         // Remove person
         function removePerson(index) {
+            console.log('removePerson called with index:', index);
             const person = people[index];
-            if (confirm(`${person.name} 님을 삭제하시겠습니까?`)) {
+            if (confirm(person.name + ' 님을 삭제하시겠습니까?')) {
                 people.splice(index, 1);
                 renderPersonList();
                 showMessage('인원이 삭제되었습니다.', 'info');
             }
         }
+        window.removePerson = removePerson;
 
         // Clear all data
         function clearAllData() {
@@ -1139,6 +1141,7 @@
 
         // Remove vacation
         function removeVacation(personIndex, vacationIndex) {
+            console.log('removeVacation called:', personIndex, vacationIndex);
             const person = people[personIndex];
             if (!person || !person.vacations || !person.vacations[vacationIndex]) {
                 showMessage('삭제 오류: 휴가를 찾을 수 없습니다.', 'error');
@@ -1146,12 +1149,13 @@
             }
 
             const vacation = person.vacations[vacationIndex];
-            if (confirm(`${person.name}의 휴가 (Day ${vacation.start} ~ ${vacation.end})를 삭제하시겠습니까?`)) {
+            if (confirm(person.name + '의 휴가 (Day ' + vacation.start + ' ~ ' + vacation.end + ')를 삭제하시겠습니까?')) {
                 person.vacations.splice(vacationIndex, 1);
                 renderPersonList();
                 showMessage('휴가가 삭제되었습니다.', 'success');
             }
         }
+        window.removeVacation = removeVacation;
 
         // Add preferred duty day
         function addPreferredDuty(personIndex) {
@@ -1993,6 +1997,27 @@
             renderPersonList();
             showMessage(`${person.name}님의 정보가 수정되었습니다.`, 'success');
         }
+
+        // Expose all functions to global scope for onclick handlers
+        window.removeWeeklyRestriction = removeWeeklyRestriction;
+        window.removePreferredDuty = removePreferredDuty;
+        window.addVacation = addVacation;
+        window.addWeeklyRestriction = addWeeklyRestriction;
+        window.addPreferredDuty = addPreferredDuty;
+        window.toggleEditMode = toggleEditMode;
+        window.savePersonEdit = savePersonEdit;
+
+        console.log('All functions exposed to window:', {
+            removePerson: typeof window.removePerson,
+            removeVacation: typeof window.removeVacation,
+            removeWeeklyRestriction: typeof window.removeWeeklyRestriction,
+            removePreferredDuty: typeof window.removePreferredDuty,
+            addVacation: typeof window.addVacation,
+            addWeeklyRestriction: typeof window.addWeeklyRestriction,
+            addPreferredDuty: typeof window.addPreferredDuty,
+            toggleEditMode: typeof window.toggleEditMode,
+            savePersonEdit: typeof window.savePersonEdit
+        });
     </script>
 </body>
 </html>
