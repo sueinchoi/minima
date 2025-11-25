@@ -725,6 +725,24 @@
                 </div>
             </div>
 
+            <!-- 당직 인원 설정 -->
+            <div style="background: #fff5f0; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
+                <label style="font-size: 14px; font-weight: 600; color: #2c3e50; margin-bottom: 8px; display: block;">👥 일별 당직 인원 설정</label>
+                <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <label style="font-size: 13px; margin: 0;">🔴 당직:</label>
+                        <input type="number" id="primaryCountPerDayInput" value="1" min="1" max="10" style="width: 60px; padding: 6px; font-size: 14px;" onchange="updateDutyCountSettings()">
+                        <span style="font-size: 13px; color: #666;">명</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <label style="font-size: 13px; margin: 0;">🔵 2nd 당직:</label>
+                        <input type="number" id="secondaryCountPerDayInput" value="1" min="1" max="10" style="width: 60px; padding: 6px; font-size: 14px;" onchange="updateDutyCountSettings()">
+                        <span style="font-size: 13px; color: #666;">명</span>
+                    </div>
+                    <span id="dutyCountDisplay" style="font-size: 12px; color: #888;">(일별 총 2명)</span>
+                </div>
+            </div>
+
             <div id="scheduleWarning" class="alert alert-error" style="display: none; font-size: 13px; margin-bottom: 10px;">
                 ⚠️ <strong>사람 정보가 변경되었습니다.</strong> 변경된 정보를 반영하려면 당직표를 다시 생성해주세요.
             </div>
@@ -762,6 +780,32 @@
         const DAYS_OF_WEEK = ['월', '화', '수', '목', '금'];
         const TOTAL_DAYS = 20;
         const WEEKS = 4;
+
+        // 일별 당직 인원 설정
+        let primaryCountPerDay = 1;  // 일별 당직 인원 수
+        let secondaryCountPerDay = 1;  // 일별 2nd 당직 인원 수
+
+        // 당직 인원 설정 업데이트
+        function updateDutyCountSettings() {
+            const primaryInput = document.getElementById('primaryCountPerDayInput');
+            const secondaryInput = document.getElementById('secondaryCountPerDayInput');
+            const display = document.getElementById('dutyCountDisplay');
+
+            primaryCountPerDay = parseInt(primaryInput.value) || 1;
+            secondaryCountPerDay = parseInt(secondaryInput.value) || 1;
+
+            // 유효 범위 검증
+            if (primaryCountPerDay < 1) primaryCountPerDay = 1;
+            if (primaryCountPerDay > 10) primaryCountPerDay = 10;
+            if (secondaryCountPerDay < 1) secondaryCountPerDay = 1;
+            if (secondaryCountPerDay > 10) secondaryCountPerDay = 10;
+
+            primaryInput.value = primaryCountPerDay;
+            secondaryInput.value = secondaryCountPerDay;
+
+            const total = primaryCountPerDay + secondaryCountPerDay;
+            display.textContent = `(일별 총 ${total}명)`;
+        }
 
         // 사람 정보 변경 시 경고 표시
         function markPeopleModified() {
@@ -1768,6 +1812,13 @@
                 return;
             }
 
+            // 인원 수 확인
+            const totalPerDay = primaryCountPerDay + secondaryCountPerDay;
+            if (people.length < totalPerDay) {
+                showMessage(`인원이 부족합니다. 일별 ${totalPerDay}명이 필요한데 ${people.length}명만 등록되어 있습니다.`, 'error');
+                return;
+            }
+
             // Reset counts
             people.forEach(p => {
                 p.primaryCount = 0;
@@ -1775,7 +1826,6 @@
             });
 
             schedule = [];
-            const assignments = [];
 
             // Try to generate schedule
             let success = true;
@@ -1801,126 +1851,113 @@
                     const dayOfWeek = DAYS_OF_WEEK[day % 5];
                     const dayNumber = day + 1;
 
-                    // Find primary duty - check for preferred duty first
-                    let primary = null;
-                    // For preferred duty, MUST check max duties (absolute constraint) and vacation
-                    const preferredPrimaryPeople = people.filter(p =>
-                        p.hasPreferredDuty(dayNumber, 'primary') &&
-                        !p.isOnVacation(dayNumber) &&
-                        p.canTakeMoreDuties() // ABSOLUTE: must respect max duties
-                    );
+                    // 이 날 배정된 인원 추적
+                    const assignedToday = [];
 
-                    // Debug logging
-                    if (preferredPrimaryPeople.length > 0) {
-                        console.log(`✅ Day ${dayNumber}: Found ${preferredPrimaryPeople.length} people with preferred primary duty:`, preferredPrimaryPeople.map(p => p.name), '(max duties checked)');
-                    }
+                    // Find primary duties (다중 인원 지원)
+                    const primaries = [];
+                    for (let i = 0; i < primaryCountPerDay; i++) {
+                        // 선호 당직자 먼저 확인
+                        const preferredPrimaryPeople = people.filter(p =>
+                            !assignedToday.includes(p) &&
+                            p.hasPreferredDuty(dayNumber, 'primary') &&
+                            !p.isOnVacation(dayNumber) &&
+                            p.canTakeMoreDuties()
+                        );
 
-                    if (preferredPrimaryPeople.length > 0) {
-                        primary = preferredPrimaryPeople[0];
-                        console.log(`✅ Day ${dayNumber}: Assigned preferred primary duty to ${primary.name}`);
-                    } else {
-                        const primaryCandidates = people.filter(p =>
-                            p.canDoPrimaryDuty(dayOfWeek, dayNumber, weekNumber) &&
-                            p.canTakeMoreDuties() &&
-                            !isConsecutive(schedule, p.name, day)
-                        ).sort((a, b) => {
-                            // If same maxDuties, balance total duties within the group
-                            if (a.maxDuties === b.maxDuties) {
-                                return a.getTotalDuties() - b.getTotalDuties();
+                        let primary = null;
+                        if (preferredPrimaryPeople.length > 0) {
+                            primary = preferredPrimaryPeople[0];
+                        } else {
+                            const primaryCandidates = people.filter(p =>
+                                !assignedToday.includes(p) &&
+                                p.canDoPrimaryDuty(dayOfWeek, dayNumber, weekNumber) &&
+                                p.canTakeMoreDuties() &&
+                                !isConsecutive(schedule, p.name, day)
+                            ).sort((a, b) => {
+                                if (a.maxDuties === b.maxDuties) {
+                                    return a.getTotalDuties() - b.getTotalDuties();
+                                }
+                                return a.primaryCount - b.primaryCount;
+                            });
+
+                            if (primaryCandidates.length === 0) {
+                                success = false;
+                                failureDay = dayNumber;
+                                failureReason = `Day ${dayNumber} (${dayOfWeek}, ${weekNumber}주차): 당직 ${i + 1}번째 인원을 배정할 수 없습니다.`;
+                                break;
                             }
-                            // Otherwise compare by primary count
-                            return a.primaryCount - b.primaryCount;
-                        });
-
-                        if (primaryCandidates.length === 0) {
-                            success = false;
-                            failureDay = dayNumber;
-                            failureReason = `Day ${dayNumber} (${dayOfWeek}, ${weekNumber}주차): 당직을 배정할 수 있는 사람이 없습니다. 불가능한 요일, 휴가, 최대 당직 횟수, 연속 당직 등을 확인해주세요.`;
-                            break;
+                            primary = primaryCandidates[0];
                         }
 
-                        primary = primaryCandidates[0];
-                    }
-
-                    if (!primary) {
-                        success = false;
-                        if (!failureReason) {
-                            failureDay = dayNumber;
-                            failureReason = `Day ${dayNumber} (${dayOfWeek}, ${weekNumber}주차): 당직을 배정할 수 없습니다.`;
+                        if (primary) {
+                            primaries.push(primary);
+                            assignedToday.push(primary);
+                            primary.primaryCount++;
                         }
-                        break;
                     }
 
-                    // Find secondary duty - check for preferred duty first
-                    let secondary = null;
-                    // For preferred duty, MUST check max duties (absolute constraint) and vacation
-                    const preferredSecondaryPeople = people.filter(p =>
-                        p !== primary &&
-                        p.hasPreferredDuty(dayNumber, 'secondary') &&
-                        !p.isOnVacation(dayNumber) &&
-                        p.canTakeMoreDuties() // ABSOLUTE: must respect max duties
-                    );
+                    if (!success) break;
 
-                    // Debug logging
-                    if (preferredSecondaryPeople.length > 0) {
-                        console.log(`✅ Day ${dayNumber}: Found ${preferredSecondaryPeople.length} people with preferred secondary duty:`, preferredSecondaryPeople.map(p => p.name), '(max duties checked)');
-                    }
+                    // Find secondary duties (다중 인원 지원)
+                    const secondaries = [];
+                    for (let i = 0; i < secondaryCountPerDay; i++) {
+                        // 선호 2nd 당직자 먼저 확인
+                        const preferredSecondaryPeople = people.filter(p =>
+                            !assignedToday.includes(p) &&
+                            p.hasPreferredDuty(dayNumber, 'secondary') &&
+                            !p.isOnVacation(dayNumber) &&
+                            p.canTakeMoreDuties()
+                        );
 
-                    if (preferredSecondaryPeople.length > 0) {
-                        secondary = preferredSecondaryPeople[0];
-                        console.log(`✅ Day ${dayNumber}: Assigned preferred secondary duty to ${secondary.name}`);
-                    } else {
-                        const secondaryCandidates = people.filter(p =>
-                            p !== primary &&
-                            p.canDoSecondaryDuty(dayOfWeek, dayNumber, weekNumber) &&
-                            (p.secondDutyPref === 'preferred' ||
-                             (p.secondDutyPref === '2nd-only' && p.canTakeMoreDuties()) ||
-                             (p.secondDutyPref === 'limited' && p.secondaryCount < 1) ||
-                             (p.secondDutyPref === 'normal' && p.canTakeMoreDuties())) &&
-                            !isConsecutive(schedule, p.name, day)
-                        ).sort((a, b) => {
-                            // Prefer people who prefer 2nd duty or are 2nd-only
-                            if (a.secondDutyPref === 'preferred' && b.secondDutyPref !== 'preferred') return -1;
-                            if (b.secondDutyPref === 'preferred' && a.secondDutyPref !== 'preferred') return 1;
-                            if (a.secondDutyPref === '2nd-only' && b.secondDutyPref !== '2nd-only' && b.secondDutyPref !== 'preferred') return -1;
-                            if (b.secondDutyPref === '2nd-only' && a.secondDutyPref !== '2nd-only' && a.secondDutyPref !== 'preferred') return 1;
+                        let secondary = null;
+                        if (preferredSecondaryPeople.length > 0) {
+                            secondary = preferredSecondaryPeople[0];
+                        } else {
+                            const secondaryCandidates = people.filter(p =>
+                                !assignedToday.includes(p) &&
+                                p.canDoSecondaryDuty(dayOfWeek, dayNumber, weekNumber) &&
+                                (p.secondDutyPref === 'preferred' ||
+                                 (p.secondDutyPref === '2nd-only' && p.canTakeMoreDuties()) ||
+                                 (p.secondDutyPref === 'limited' && p.secondaryCount < 1) ||
+                                 (p.secondDutyPref === 'normal' && p.canTakeMoreDuties())) &&
+                                !isConsecutive(schedule, p.name, day)
+                            ).sort((a, b) => {
+                                if (a.secondDutyPref === 'preferred' && b.secondDutyPref !== 'preferred') return -1;
+                                if (b.secondDutyPref === 'preferred' && a.secondDutyPref !== 'preferred') return 1;
+                                if (a.secondDutyPref === '2nd-only' && b.secondDutyPref !== '2nd-only' && b.secondDutyPref !== 'preferred') return -1;
+                                if (b.secondDutyPref === '2nd-only' && a.secondDutyPref !== '2nd-only' && a.secondDutyPref !== 'preferred') return 1;
+                                if (a.maxDuties === b.maxDuties) {
+                                    return a.getTotalDuties() - b.getTotalDuties();
+                                }
+                                return a.secondaryCount - b.secondaryCount;
+                            });
 
-                            // If same maxDuties, balance total duties within the group
-                            if (a.maxDuties === b.maxDuties) {
-                                return a.getTotalDuties() - b.getTotalDuties();
+                            if (secondaryCandidates.length === 0) {
+                                success = false;
+                                failureDay = dayNumber;
+                                failureReason = `Day ${dayNumber} (${dayOfWeek}, ${weekNumber}주차): 2nd 당직 ${i + 1}번째 인원을 배정할 수 없습니다.`;
+                                break;
                             }
-                            return a.secondaryCount - b.secondaryCount;
-                        });
-
-                        if (secondaryCandidates.length === 0) {
-                            success = false;
-                            failureDay = dayNumber;
-                            failureReason = `Day ${dayNumber} (${dayOfWeek}, ${weekNumber}주차): 2nd 당직을 배정할 수 있는 사람이 없습니다. 2nd Duty 선호도, 불가능한 요일, 휴가, 최대 당직 횟수 등을 확인해주세요.`;
-                            break;
+                            secondary = secondaryCandidates[0];
                         }
 
-                        secondary = secondaryCandidates[0];
+                        if (secondary) {
+                            secondaries.push(secondary);
+                            assignedToday.push(secondary);
+                            secondary.secondaryCount++;
+                        }
                     }
 
-                    if (!secondary) {
-                        success = false;
-                        if (!failureReason) {
-                            failureDay = dayNumber;
-                            failureReason = `Day ${dayNumber} (${dayOfWeek}, ${weekNumber}주차): 2nd 당직을 배정할 수 없습니다.`;
-                        }
-                        break;
-                    }
+                    if (!success) break;
 
                     schedule.push({
                         day: dayNumber,
                         week: weekNumber,
                         dayOfWeek: dayOfWeek,
-                        primary: primary.name,
-                        secondary: secondary.name
+                        primaries: primaries.map(p => p.name),
+                        secondaries: secondaries.map(p => p.name)
                     });
-
-                    primary.primaryCount++;
-                    secondary.secondaryCount++;
                 }
 
                 if (success) break;
@@ -1935,7 +1972,8 @@
                 errorMsg += `- 최대 당직 횟수를 늘려주세요\n`;
                 errorMsg += `- 불가능한 요일 수를 줄여주세요\n`;
                 errorMsg += `- 인원을 추가해주세요\n`;
-                errorMsg += `- 휴가 기간을 조정해주세요\n\n`;
+                errorMsg += `- 휴가 기간을 조정해주세요\n`;
+                errorMsg += `- 일별 당직 인원 수를 줄여주세요\n\n`;
                 errorMsg += `(${attempts}번 시도)`;
 
                 alert(errorMsg);
@@ -1957,6 +1995,13 @@
         function generateMultipleSchedules() {
             if (people.length === 0) {
                 showMessage('인원을 먼저 추가해주세요.', 'error');
+                return;
+            }
+
+            // 인원 수 확인
+            const totalPerDay = primaryCountPerDay + secondaryCountPerDay;
+            if (people.length < totalPerDay) {
+                showMessage(`인원이 부족합니다. 일별 ${totalPerDay}명이 필요한데 ${people.length}명만 등록되어 있습니다.`, 'error');
                 return;
             }
 
@@ -1985,112 +2030,122 @@
                     const dayOfWeek = DAYS_OF_WEEK[day % 5];
                     const dayNumber = day + 1;
 
-                    // Find primary duty - check for preferred duty first
-                    let primary = null;
-                    // For preferred duty, MUST check max duties (absolute constraint) and vacation
-                    const preferredPrimaryPeople = people.filter(p =>
-                        p.hasPreferredDuty(dayNumber, 'primary') &&
-                        !p.isOnVacation(dayNumber) &&
-                        p.canTakeMoreDuties() // ABSOLUTE: must respect max duties
-                    );
+                    // 이 날 배정된 인원 추적
+                    const assignedToday = [];
 
-                    if (preferredPrimaryPeople.length > 0) {
-                        primary = preferredPrimaryPeople[0];
-                    } else {
-                        // Find primary duty with randomization
-                        const primaryCandidates = people.filter(p =>
-                            p.canDoPrimaryDuty(dayOfWeek, dayNumber, weekNumber) &&
-                            p.canTakeMoreDuties() &&
-                            !isConsecutive(tempSchedule, p.name, day)
-                        ).sort((a, b) => {
-                            // If same maxDuties, balance total duties within the group
-                            if (a.maxDuties === b.maxDuties) {
-                                return a.getTotalDuties() - b.getTotalDuties();
-                            }
-                            // Otherwise compare by primary count
-                            return a.primaryCount - b.primaryCount;
-                        });
-
-                        if (primaryCandidates.length === 0) {
-                            success = false;
-                            break;
-                        }
-
-                        // Randomly select from candidates with lowest total duties in same maxDuties group
-                        const firstCandidate = primaryCandidates[0];
-                        const bestCandidates = primaryCandidates.filter(p =>
-                            p.maxDuties === firstCandidate.maxDuties &&
-                            p.getTotalDuties() === firstCandidate.getTotalDuties()
+                    // Find primary duties (다중 인원 지원)
+                    const primaries = [];
+                    for (let i = 0; i < primaryCountPerDay; i++) {
+                        const preferredPrimaryPeople = people.filter(p =>
+                            !assignedToday.includes(p) &&
+                            p.hasPreferredDuty(dayNumber, 'primary') &&
+                            !p.isOnVacation(dayNumber) &&
+                            p.canTakeMoreDuties()
                         );
-                        primary = bestCandidates[Math.floor(Math.random() * bestCandidates.length)];
-                    }
 
-                    if (!primary) {
-                        success = false;
-                        break;
-                    }
+                        let primary = null;
+                        if (preferredPrimaryPeople.length > 0) {
+                            primary = preferredPrimaryPeople[0];
+                        } else {
+                            const primaryCandidates = people.filter(p =>
+                                !assignedToday.includes(p) &&
+                                p.canDoPrimaryDuty(dayOfWeek, dayNumber, weekNumber) &&
+                                p.canTakeMoreDuties() &&
+                                !isConsecutive(tempSchedule, p.name, day)
+                            ).sort((a, b) => {
+                                if (a.maxDuties === b.maxDuties) {
+                                    return a.getTotalDuties() - b.getTotalDuties();
+                                }
+                                return a.primaryCount - b.primaryCount;
+                            });
 
-                    // Find secondary duty - check for preferred duty first
-                    let secondary = null;
-                    // For preferred duty, MUST check max duties (absolute constraint) and vacation
-                    const preferredSecondaryPeople = people.filter(p =>
-                        p !== primary &&
-                        p.hasPreferredDuty(dayNumber, 'secondary') &&
-                        !p.isOnVacation(dayNumber) &&
-                        p.canTakeMoreDuties() // ABSOLUTE: must respect max duties
-                    );
-
-                    if (preferredSecondaryPeople.length > 0) {
-                        secondary = preferredSecondaryPeople[0];
-                    } else {
-                        // Find secondary duty with randomization
-                        const secondaryCandidates = people.filter(p =>
-                            p !== primary &&
-                            p.canDoSecondaryDuty(dayOfWeek, dayNumber, weekNumber) &&
-                            (p.secondDutyPref === 'preferred' ||
-                             (p.secondDutyPref === '2nd-only' && p.canTakeMoreDuties()) ||
-                             (p.secondDutyPref === 'limited' && p.secondaryCount < 1) ||
-                             (p.secondDutyPref === 'normal' && p.canTakeMoreDuties())) &&
-                            !isConsecutive(tempSchedule, p.name, day)
-                        ).sort((a, b) => {
-                            // Prefer people who prefer 2nd duty or are 2nd-only
-                            if (a.secondDutyPref === 'preferred' && b.secondDutyPref !== 'preferred') return -1;
-                            if (b.secondDutyPref === 'preferred' && a.secondDutyPref !== 'preferred') return 1;
-                            if (a.secondDutyPref === '2nd-only' && b.secondDutyPref !== '2nd-only' && b.secondDutyPref !== 'preferred') return -1;
-                            if (b.secondDutyPref === '2nd-only' && a.secondDutyPref !== '2nd-only' && a.secondDutyPref !== 'preferred') return 1;
-
-                            // If same maxDuties, balance total duties within the group
-                            if (a.maxDuties === b.maxDuties) {
-                                return a.getTotalDuties() - b.getTotalDuties();
+                            if (primaryCandidates.length === 0) {
+                                success = false;
+                                break;
                             }
-                            return a.secondaryCount - b.secondaryCount;
-                        });
 
-                        if (secondaryCandidates.length === 0) {
+                            // Randomly select from candidates with lowest total duties
+                            const firstCandidate = primaryCandidates[0];
+                            const bestCandidates = primaryCandidates.filter(p =>
+                                p.maxDuties === firstCandidate.maxDuties &&
+                                p.getTotalDuties() === firstCandidate.getTotalDuties()
+                            );
+                            primary = bestCandidates[Math.floor(Math.random() * bestCandidates.length)];
+                        }
+
+                        if (primary) {
+                            primaries.push(primary);
+                            assignedToday.push(primary);
+                            primary.primaryCount++;
+                        } else {
                             success = false;
                             break;
                         }
-
-                        // Randomly select from top candidates
-                        const topCandidates = secondaryCandidates.slice(0, Math.min(3, secondaryCandidates.length));
-                        secondary = topCandidates[Math.floor(Math.random() * topCandidates.length)];
                     }
 
-                    if (!secondary) {
-                        success = false;
-                        break;
+                    if (!success) break;
+
+                    // Find secondary duties (다중 인원 지원)
+                    const secondaries = [];
+                    for (let i = 0; i < secondaryCountPerDay; i++) {
+                        const preferredSecondaryPeople = people.filter(p =>
+                            !assignedToday.includes(p) &&
+                            p.hasPreferredDuty(dayNumber, 'secondary') &&
+                            !p.isOnVacation(dayNumber) &&
+                            p.canTakeMoreDuties()
+                        );
+
+                        let secondary = null;
+                        if (preferredSecondaryPeople.length > 0) {
+                            secondary = preferredSecondaryPeople[0];
+                        } else {
+                            const secondaryCandidates = people.filter(p =>
+                                !assignedToday.includes(p) &&
+                                p.canDoSecondaryDuty(dayOfWeek, dayNumber, weekNumber) &&
+                                (p.secondDutyPref === 'preferred' ||
+                                 (p.secondDutyPref === '2nd-only' && p.canTakeMoreDuties()) ||
+                                 (p.secondDutyPref === 'limited' && p.secondaryCount < 1) ||
+                                 (p.secondDutyPref === 'normal' && p.canTakeMoreDuties())) &&
+                                !isConsecutive(tempSchedule, p.name, day)
+                            ).sort((a, b) => {
+                                if (a.secondDutyPref === 'preferred' && b.secondDutyPref !== 'preferred') return -1;
+                                if (b.secondDutyPref === 'preferred' && a.secondDutyPref !== 'preferred') return 1;
+                                if (a.secondDutyPref === '2nd-only' && b.secondDutyPref !== '2nd-only' && b.secondDutyPref !== 'preferred') return -1;
+                                if (b.secondDutyPref === '2nd-only' && a.secondDutyPref !== '2nd-only' && a.secondDutyPref !== 'preferred') return 1;
+                                if (a.maxDuties === b.maxDuties) {
+                                    return a.getTotalDuties() - b.getTotalDuties();
+                                }
+                                return a.secondaryCount - b.secondaryCount;
+                            });
+
+                            if (secondaryCandidates.length === 0) {
+                                success = false;
+                                break;
+                            }
+
+                            const topCandidates = secondaryCandidates.slice(0, Math.min(3, secondaryCandidates.length));
+                            secondary = topCandidates[Math.floor(Math.random() * topCandidates.length)];
+                        }
+
+                        if (secondary) {
+                            secondaries.push(secondary);
+                            assignedToday.push(secondary);
+                            secondary.secondaryCount++;
+                        } else {
+                            success = false;
+                            break;
+                        }
                     }
+
+                    if (!success) break;
 
                     tempSchedule.push({
                         day: dayNumber,
                         week: weekNumber,
                         dayOfWeek: dayOfWeek,
-                        primary: primary.name,
-                        secondary: secondary.name
+                        primaries: primaries.map(p => p.name),
+                        secondaries: secondaries.map(p => p.name)
                     });
-
-                    primary.primaryCount++;
-                    secondary.secondaryCount++;
                 }
 
                 if (success && !isDuplicateSchedule(tempSchedule, schedules)) {
@@ -2106,7 +2161,8 @@
                 errorMsg += `- 불가능한 요일 수를 줄여주세요\n`;
                 errorMsg += `- 인원을 추가해주세요\n`;
                 errorMsg += `- 휴가 기간을 조정해주세요\n`;
-                errorMsg += `- 주별 제약 조건을 완화해주세요`;
+                errorMsg += `- 주별 제약 조건을 완화해주세요\n`;
+                errorMsg += `- 일별 당직 인원 수를 줄여주세요`;
 
                 alert(errorMsg);
                 showMessage('당직표 생성 실패', 'error');
@@ -2131,10 +2187,16 @@
         // Check if schedule is duplicate
         function isDuplicateSchedule(newSchedule, existingSchedules) {
             return existingSchedules.some(existing => {
-                return existing.every((day, index) =>
-                    day.primary === newSchedule[index].primary &&
-                    day.secondary === newSchedule[index].secondary
-                );
+                return existing.every((day, index) => {
+                    const newDay = newSchedule[index];
+                    // 배열 형태 (다중 인원)
+                    if (Array.isArray(day.primaries)) {
+                        return JSON.stringify(day.primaries) === JSON.stringify(newDay.primaries) &&
+                               JSON.stringify(day.secondaries) === JSON.stringify(newDay.secondaries);
+                    }
+                    // 기존 형태 (단일 인원)
+                    return day.primary === newDay.primary && day.secondary === newDay.secondary;
+                });
             });
         }
 
@@ -2173,6 +2235,11 @@
             const previousDay = schedule[currentDay - 1];
             if (!previousDay) return false;
 
+            // 배열 형태 지원 (다중 인원)
+            if (Array.isArray(previousDay.primaries)) {
+                return previousDay.primaries.includes(personName) || previousDay.secondaries.includes(personName);
+            }
+            // 기존 단일 인원 형태 지원 (하위 호환)
             return previousDay.primary === personName || previousDay.secondary === personName;
         }
 
@@ -2215,22 +2282,44 @@
                     }
                 }
 
+                // 배열 형태와 단일 형태 모두 지원
+                const primaries = Array.isArray(day.primaries) ? day.primaries : [day.primary];
+                const secondaries = Array.isArray(day.secondaries) ? day.secondaries : [day.secondary];
+
                 let contentHTML = '';
                 if (isEditing) {
-                    // Edit mode
+                    // Edit mode - 다중 선택 지원
+                    let primarySelects = '';
+                    primaries.forEach((name, i) => {
+                        primarySelects += `
+                            <div style="margin-bottom: 5px;">
+                                <label style="font-size: 11px; margin: 0;">당직 ${primaries.length > 1 ? (i + 1) : ''}</label>
+                                <select id="editPrimary_${index}_${i}">
+                                    ${people.map(p => `<option value="${p.name}" ${p.name === name ? 'selected' : ''}>${p.name}</option>`).join('')}
+                                </select>
+                            </div>
+                        `;
+                    });
+
+                    let secondarySelects = '';
+                    secondaries.forEach((name, i) => {
+                        secondarySelects += `
+                            <div style="margin-bottom: 5px;">
+                                <label style="font-size: 11px; margin: 0;">2nd ${secondaries.length > 1 ? (i + 1) : ''}</label>
+                                <select id="editSecondary_${index}_${i}">
+                                    ${people.map(p => `<option value="${p.name}" ${p.name === name ? 'selected' : ''}>${p.name}</option>`).join('')}
+                                </select>
+                            </div>
+                        `;
+                    });
+
                     contentHTML = `
                         <div class="day-header">
                             <span class="day-number">Day ${day.day}</span> ${day.dayOfWeek}요일${dateDisplay}
                         </div>
                         <div class="edit-controls">
-                            <label style="font-size: 12px; margin: 0;">당직 (Primary)</label>
-                            <select id="editPrimary_${index}">
-                                ${people.map(p => `<option value="${p.name}" ${p.name === day.primary ? 'selected' : ''}>${p.name}</option>`).join('')}
-                            </select>
-                            <label style="font-size: 12px; margin: 0;">2nd Duty</label>
-                            <select id="editSecondary_${index}">
-                                ${people.map(p => `<option value="${p.name}" ${p.name === day.secondary ? 'selected' : ''}>${p.name}</option>`).join('')}
-                            </select>
+                            ${primarySelects}
+                            ${secondarySelects}
                             <div>
                                 <button onclick="saveEdit(${index})" style="background: #27ae60;">저장</button>
                                 <button onclick="cancelEdit()" class="secondary">취소</button>
@@ -2238,14 +2327,17 @@
                         </div>
                     `;
                 } else {
-                    // Display mode
+                    // Display mode - 다중 인원 표시
+                    const primaryDisplay = primaries.map(name => `🔴 ${name}`).join('<br>');
+                    const secondaryDisplay = secondaries.map(name => `🔵 ${name}`).join('<br>');
+
                     contentHTML = `
                         <div class="day-header">
                             <span class="day-number">Day ${day.day}</span> ${day.dayOfWeek}요일${dateDisplay}
                         </div>
                         <div class="duty-assignment">
-                            <div class="duty-primary">🔴 ${day.primary}</div>
-                            <div class="duty-secondary">🔵 ${day.secondary}</div>
+                            <div class="duty-primary">${primaryDisplay}</div>
+                            <div class="duty-secondary">${secondaryDisplay}</div>
                         </div>
                         ${vacationHTML}
                     `;
@@ -2280,128 +2372,96 @@
 
         // Save edit with comprehensive validation
         function saveEdit(dayIndex) {
-            const primarySelect = document.getElementById(`editPrimary_${dayIndex}`);
-            const secondarySelect = document.getElementById(`editSecondary_${dayIndex}`);
-
-            const newPrimary = primarySelect.value;
-            const newSecondary = secondarySelect.value;
-
-            if (newPrimary === newSecondary) {
-                showMessage('❌ 당직과 2nd duty는 같은 사람일 수 없습니다.', 'error');
-                return;
-            }
-
             const day = schedule[dayIndex];
             const dayOfWeek = day.dayOfWeek;
             const dayNumber = day.day;
             const weekNumber = day.week;
-            const oldPrimary = day.primary;
-            const oldSecondary = day.secondary;
 
-            // Find person objects
-            const primaryPerson = people.find(p => p.name === newPrimary);
-            const secondaryPerson = people.find(p => p.name === newSecondary);
+            // 현재 배열 형태인지 확인
+            const currentPrimaries = Array.isArray(day.primaries) ? day.primaries : [day.primary];
+            const currentSecondaries = Array.isArray(day.secondaries) ? day.secondaries : [day.secondary];
+
+            // 새로운 값 수집
+            const newPrimaries = [];
+            for (let i = 0; i < currentPrimaries.length; i++) {
+                const select = document.getElementById(`editPrimary_${dayIndex}_${i}`);
+                if (select) newPrimaries.push(select.value);
+            }
+
+            const newSecondaries = [];
+            for (let i = 0; i < currentSecondaries.length; i++) {
+                const select = document.getElementById(`editSecondary_${dayIndex}_${i}`);
+                if (select) newSecondaries.push(select.value);
+            }
+
+            // 중복 체크
+            const allSelected = [...newPrimaries, ...newSecondaries];
+            const uniqueSelected = new Set(allSelected);
+            if (uniqueSelected.size !== allSelected.length) {
+                showMessage('❌ 같은 사람이 여러 번 선택되었습니다. 중복을 제거해주세요.', 'error');
+                return;
+            }
 
             // Collect all warnings
             const warnings = [];
 
-            // Validate primary duty assignment
-            if (primaryPerson) {
-                // Check if person is 2nd duty only
-                if (primaryPerson.secondDutyPref === '2nd-only') {
-                    warnings.push(`⚠️ ${newPrimary}님은 "2nd duty만" 가능한 설정입니다. 일반 당직에 배정할 수 없습니다.`);
-                }
-
-                // Check vacation
-                if (primaryPerson.isOnVacation(dayNumber)) {
-                    warnings.push(`⚠️ ${newPrimary}님은 Day ${dayNumber}에 휴가 중입니다.`);
-                }
-
-                // Check if primary duty is possible
-                if (!primaryPerson.canDoPrimaryDuty(dayOfWeek, dayNumber, weekNumber)) {
-                    // Check if it's due to weekly restriction
-                    if (primaryPerson.weeklyRestrictions && primaryPerson.weeklyRestrictions[weekNumber]) {
-                        const weekRestriction = primaryPerson.weeklyRestrictions[weekNumber];
-                        if (weekRestriction.unavailable && weekRestriction.unavailable.includes(dayOfWeek)) {
-                            const canDo2nd = weekRestriction.alternative && weekRestriction.alternative.includes(dayOfWeek);
-                            const altText = canDo2nd ? ` (${dayOfWeek}요일은 2nd duty로만 가능합니다)` : '';
-                            warnings.push(`⚠️ ${newPrimary}님은 ${weekNumber}주차 ${dayOfWeek}요일에 일반 당직을 할 수 없습니다.${altText}`);
-                        }
+            // Validate primary duty assignments
+            newPrimaries.forEach((name, idx) => {
+                const person = people.find(p => p.name === name);
+                if (person) {
+                    if (person.secondDutyPref === '2nd-only') {
+                        warnings.push(`⚠️ ${name}님은 "2nd duty만" 가능한 설정입니다.`);
                     }
-                    // Check general unavailable days
-                    else if (primaryPerson.unavailableDays.includes(dayOfWeek)) {
-                        const canDo2nd = primaryPerson.alternativeDays.includes(dayOfWeek);
-                        const altText = canDo2nd ? ` (${dayOfWeek}요일은 2nd duty로만 가능합니다)` : '';
-                        warnings.push(`⚠️ ${newPrimary}님은 ${dayOfWeek}요일에 일반 당직을 할 수 없습니다.${altText}`);
+                    if (person.isOnVacation(dayNumber)) {
+                        warnings.push(`⚠️ ${name}님은 Day ${dayNumber}에 휴가 중입니다.`);
+                    }
+                    if (!person.canDoPrimaryDuty(dayOfWeek, dayNumber, weekNumber)) {
+                        warnings.push(`⚠️ ${name}님은 ${dayOfWeek}요일에 당직을 할 수 없습니다.`);
+                    }
+                    if (isConsecutive(schedule, name, dayIndex)) {
+                        warnings.push(`⚠️ ${name}님은 연속 당직이 됩니다.`);
                     }
                 }
+            });
 
-                // Check consecutive duties
-                if (isConsecutive(schedule, newPrimary, dayIndex)) {
-                    warnings.push(`⚠️ ${newPrimary}님은 연속 당직이 됩니다. (Day ${dayIndex}와 인접)`);
-                }
-            }
-
-            // Validate secondary duty assignment
-            if (secondaryPerson) {
-                // Check vacation
-                if (secondaryPerson.isOnVacation(dayNumber)) {
-                    warnings.push(`⚠️ ${newSecondary}님은 Day ${dayNumber}에 휴가 중입니다.`);
-                }
-
-                // Check if secondary duty is possible
-                if (!secondaryPerson.canDoSecondaryDuty(dayOfWeek, dayNumber, weekNumber)) {
-                    // Check if it's due to weekly restriction
-                    if (secondaryPerson.weeklyRestrictions && secondaryPerson.weeklyRestrictions[weekNumber]) {
-                        const weekRestriction = secondaryPerson.weeklyRestrictions[weekNumber];
-                        if (weekRestriction.unavailable && weekRestriction.unavailable.includes(dayOfWeek)) {
-                            const alternativeAllowed = weekRestriction.alternative && weekRestriction.alternative.includes(dayOfWeek);
-                            if (!alternativeAllowed) {
-                                warnings.push(`⚠️ ${newSecondary}님은 ${weekNumber}주차 ${dayOfWeek}요일에 2nd duty를 할 수 없습니다.`);
-                            }
-                        }
+            // Validate secondary duty assignments
+            newSecondaries.forEach((name, idx) => {
+                const person = people.find(p => p.name === name);
+                if (person) {
+                    if (person.isOnVacation(dayNumber)) {
+                        warnings.push(`⚠️ ${name}님은 Day ${dayNumber}에 휴가 중입니다.`);
                     }
-                    // Check general unavailable days
-                    else if (secondaryPerson.unavailableDays.includes(dayOfWeek)) {
-                        if (!secondaryPerson.alternativeDays.includes(dayOfWeek)) {
-                            warnings.push(`⚠️ ${newSecondary}님은 ${dayOfWeek}요일에 2nd duty를 할 수 없습니다. (대체 불가)`);
-                        }
+                    if (!person.canDoSecondaryDuty(dayOfWeek, dayNumber, weekNumber)) {
+                        warnings.push(`⚠️ ${name}님은 ${dayOfWeek}요일에 2nd duty를 할 수 없습니다.`);
+                    }
+                    if (isConsecutive(schedule, name, dayIndex)) {
+                        warnings.push(`⚠️ ${name}님은 연속 당직이 됩니다.`);
                     }
                 }
+            });
 
-                // Check consecutive duties
-                if (isConsecutive(schedule, newSecondary, dayIndex)) {
-                    warnings.push(`⚠️ ${newSecondary}님은 연속 당직이 됩니다. (Day ${dayIndex}와 인접)`);
-                }
-            }
-
-            // Temporarily update to check duty counts
+            // 임시로 업데이트하여 횟수 체크
+            const tempOldPrimaries = day.primaries;
+            const tempOldSecondaries = day.secondaries;
             const tempOldPrimary = day.primary;
             const tempOldSecondary = day.secondary;
-            day.primary = newPrimary;
-            day.secondary = newSecondary;
+
+            day.primaries = newPrimaries;
+            day.secondaries = newSecondaries;
+            delete day.primary;
+            delete day.secondary;
             recalculateCounts();
 
             // Check max duty violations
-            if (primaryPerson) {
-                const totalDuties = primaryPerson.primaryCount + primaryPerson.secondaryCount;
-                if (primaryPerson.secondDutyPref !== 'preferred' && totalDuties > primaryPerson.maxDuties) {
-                    warnings.push(`⚠️ ${newPrimary}님의 당직 횟수가 최대치(${primaryPerson.maxDuties}회)를 초과합니다. (현재: ${totalDuties}회)`);
-                }
-            }
-
-            if (secondaryPerson) {
-                if (secondaryPerson.secondDutyPref === 'limited' && secondaryPerson.secondaryCount > 1) {
-                    warnings.push(`⚠️ ${newSecondary}님은 2nd duty를 1회만 할 수 있습니다. (현재: ${secondaryPerson.secondaryCount}회)`);
-                } else if (secondaryPerson.secondDutyPref === '2nd-only' && secondaryPerson.secondaryCount > secondaryPerson.maxDuties) {
-                    warnings.push(`⚠️ ${newSecondary}님의 2nd duty 횟수가 최대치(${secondaryPerson.maxDuties}회)를 초과합니다. (현재: ${secondaryPerson.secondaryCount}회)`);
-                } else if (secondaryPerson.secondDutyPref !== 'preferred' && secondaryPerson.secondDutyPref !== '2nd-only') {
-                    const totalDuties = secondaryPerson.primaryCount + secondaryPerson.secondaryCount;
-                    if (totalDuties > secondaryPerson.maxDuties) {
-                        warnings.push(`⚠️ ${newSecondary}님의 당직 횟수가 최대치(${secondaryPerson.maxDuties}회)를 초과합니다. (현재: ${totalDuties}회)`);
+            [...newPrimaries, ...newSecondaries].forEach(name => {
+                const person = people.find(p => p.name === name);
+                if (person && person.secondDutyPref !== 'preferred') {
+                    const totalDuties = person.primaryCount + person.secondaryCount;
+                    if (totalDuties > person.maxDuties) {
+                        warnings.push(`⚠️ ${name}님의 당직 횟수가 최대치(${person.maxDuties}회)를 초과합니다. (현재: ${totalDuties}회)`);
                     }
                 }
-            }
+            });
 
             // If there are warnings, show them and ask for confirmation
             if (warnings.length > 0) {
@@ -2410,8 +2470,15 @@
 
                 if (!confirm(confirmMessage)) {
                     // Revert changes
-                    day.primary = tempOldPrimary;
-                    day.secondary = tempOldSecondary;
+                    if (tempOldPrimaries) {
+                        day.primaries = tempOldPrimaries;
+                        day.secondaries = tempOldSecondaries;
+                    } else {
+                        day.primary = tempOldPrimary;
+                        day.secondary = tempOldSecondary;
+                        delete day.primaries;
+                        delete day.secondaries;
+                    }
                     recalculateCounts();
                     return;
                 }
@@ -2436,11 +2503,24 @@
 
             // Count from schedule
             schedule.forEach(day => {
-                const primaryPerson = people.find(p => p.name === day.primary);
-                const secondaryPerson = people.find(p => p.name === day.secondary);
+                // 배열 형태 (다중 인원)
+                if (Array.isArray(day.primaries)) {
+                    day.primaries.forEach(name => {
+                        const person = people.find(p => p.name === name);
+                        if (person) person.primaryCount++;
+                    });
+                    day.secondaries.forEach(name => {
+                        const person = people.find(p => p.name === name);
+                        if (person) person.secondaryCount++;
+                    });
+                } else {
+                    // 기존 형태 (단일 인원)
+                    const primaryPerson = people.find(p => p.name === day.primary);
+                    const secondaryPerson = people.find(p => p.name === day.secondary);
 
-                if (primaryPerson) primaryPerson.primaryCount++;
-                if (secondaryPerson) secondaryPerson.secondaryCount++;
+                    if (primaryPerson) primaryPerson.primaryCount++;
+                    if (secondaryPerson) secondaryPerson.secondaryCount++;
+                }
             });
         }
 
@@ -2499,7 +2579,12 @@
                 const vacationers = people.filter(p => p.isOnVacation(day.day)).map(p => p.name);
                 let vacInfo = vacationers.length > 0 ? ` (휴가: ${vacationers.join(', ')})` : '';
                 let editInfo = day.manuallyEdited ? ' [수동편집]' : '';
-                text += `Day ${day.day} (${day.dayOfWeek}): 당직 ${day.primary}, 2nd ${day.secondary}${vacInfo}${editInfo}\n`;
+
+                // 배열 형태와 단일 형태 모두 지원
+                const primaries = Array.isArray(day.primaries) ? day.primaries : [day.primary];
+                const secondaries = Array.isArray(day.secondaries) ? day.secondaries : [day.secondary];
+
+                text += `Day ${day.day} (${day.dayOfWeek}): 당직 ${primaries.join(', ')}, 2nd ${secondaries.join(', ')}${vacInfo}${editInfo}\n`;
             });
 
             // Statistics
