@@ -569,7 +569,14 @@
 
             <div class="button-group">
                 <button onclick="generateSchedule()">🎯 당직표 생성</button>
+                <button onclick="generateMultipleSchedules()">🔄 여러 경우 생성 (5개)</button>
                 <button onclick="exportSchedule()" class="secondary">💾 내보내기</button>
+            </div>
+
+            <div id="scheduleNavigation" style="display: none; text-align: center; margin: 15px 0; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                <button onclick="prevSchedule()" class="secondary" style="padding: 8px 16px;">◀ 이전</button>
+                <span id="scheduleIndicator" style="margin: 0 20px; font-weight: 600; color: #2c3e50;"></span>
+                <button onclick="nextSchedule()" class="secondary" style="padding: 8px 16px;">다음 ▶</button>
             </div>
 
             <div class="alert alert-info" style="font-size: 13px;">
@@ -586,6 +593,8 @@
         // 전역 데이터
         let people = [];
         let schedule = null;
+        let schedules = []; // 여러 스케줄 저장
+        let currentScheduleIndex = 0; // 현재 표시 중인 스케줄 인덱스
         let mixedTeamWeeks = new Set(); // 혼합팀 주차
         let editingWeekIndex = null;
         let editingPersonIndex = null; // 현재 편집 중인 인원 인덱스
@@ -1084,20 +1093,186 @@
 
             peopleModifiedAfterSchedule = false;
             updateScheduleWarning();
+
+            // 단일 스케줄 생성시 네비게이션 숨기기
+            schedules = [schedule];
+            currentScheduleIndex = 0;
+            updateScheduleNavigation();
+
             showMessage(`당직표가 성공적으로 생성되었습니다! (${attempts}번 시도)`, 'success');
             renderScheduleGrid();
             renderStatistics();
         }
 
+        // 여러 스케줄 생성 (5개)
+        function generateMultipleSchedules() {
+            if (people.length === 0) {
+                showMessage('인원을 먼저 추가해주세요.', 'error');
+                return;
+            }
+
+            const totalWeeks = parseInt(document.getElementById('totalWeeks').value) || 12;
+            const peoplePerWeek = parseInt(document.getElementById('peoplePerWeek').value) || 2;
+            const minGap = parseInt(document.getElementById('minGap').value) || 4;
+            const maxDutyPerPerson = parseInt(document.getElementById('maxDutyPerPerson').value) || 2;
+
+            if (people.length < peoplePerWeek) {
+                showMessage(`인원이 부족합니다. 주당 ${peoplePerWeek}명이 필요한데 ${people.length}명만 등록되어 있습니다.`, 'error');
+                return;
+            }
+
+            schedules = [];
+            let attempts = 0;
+            const maxTotalAttempts = 500;
+
+            while (schedules.length < 5 && attempts < maxTotalAttempts) {
+                attempts++;
+
+                // 카운트 초기화
+                people.forEach(p => p.dutyCount = 0);
+
+                let tempSchedule = [];
+                let success = true;
+
+                for (let week = 1; week <= totalWeeks; week++) {
+                    const isMixedWeek = mixedTeamWeeks.has(week);
+                    const assigned = [];
+
+                    if (isMixedWeek && peoplePerWeek >= 2) {
+                        const teamAMember = selectPerson(week, 'A', assigned, minGap, maxDutyPerPerson, tempSchedule);
+                        if (!teamAMember) { success = false; break; }
+                        assigned.push(teamAMember);
+                        teamAMember.dutyCount++;
+
+                        const teamBMember = selectPerson(week, 'B', assigned, minGap, maxDutyPerPerson, tempSchedule);
+                        if (!teamBMember) { success = false; break; }
+                        assigned.push(teamBMember);
+                        teamBMember.dutyCount++;
+
+                        for (let i = 2; i < peoplePerWeek; i++) {
+                            const member = selectPerson(week, null, assigned, minGap, maxDutyPerPerson, tempSchedule);
+                            if (!member) { success = false; break; }
+                            assigned.push(member);
+                            member.dutyCount++;
+                        }
+                    } else {
+                        for (let i = 0; i < peoplePerWeek; i++) {
+                            const member = selectPerson(week, null, assigned, minGap, maxDutyPerPerson, tempSchedule);
+                            if (!member) { success = false; break; }
+                            assigned.push(member);
+                            member.dutyCount++;
+                        }
+                    }
+
+                    if (!success) break;
+
+                    tempSchedule.push({
+                        week: week,
+                        assigned: assigned.map(p => p.name),
+                        isMixed: isMixedWeek
+                    });
+                }
+
+                if (success && !isDuplicateSchedule(tempSchedule)) {
+                    schedules.push(tempSchedule);
+                }
+            }
+
+            if (schedules.length === 0) {
+                let errorMsg = '당직표 생성에 실패했습니다.\n\n';
+                errorMsg += `💡 해결 방법:\n`;
+                errorMsg += `- 1인당 최대 횟수를 늘려주세요\n`;
+                errorMsg += `- 최소 간격을 줄여주세요\n`;
+                errorMsg += `- 인원을 추가해주세요\n`;
+                errorMsg += `- 휴가 주차를 조정해주세요\n\n`;
+                errorMsg += `(${attempts}번 시도)`;
+                alert(errorMsg);
+                showMessage('당직표 생성 실패', 'error');
+                return;
+            }
+
+            currentScheduleIndex = 0;
+            schedule = schedules[0];
+            recalculateCounts();
+
+            peopleModifiedAfterSchedule = false;
+            updateScheduleWarning();
+            updateScheduleNavigation();
+
+            showMessage(`${schedules.length}개의 당직표가 생성되었습니다! (${attempts}번 시도)`, 'success');
+            renderScheduleGrid();
+            renderStatistics();
+        }
+
+        // 중복 스케줄 체크
+        function isDuplicateSchedule(newSchedule) {
+            for (const existingSchedule of schedules) {
+                if (existingSchedule.length !== newSchedule.length) continue;
+
+                let isDuplicate = true;
+                for (let i = 0; i < newSchedule.length; i++) {
+                    const newWeek = newSchedule[i];
+                    const existingWeek = existingSchedule[i];
+
+                    const newAssigned = [...newWeek.assigned].sort().join(',');
+                    const existingAssigned = [...existingWeek.assigned].sort().join(',');
+
+                    if (newAssigned !== existingAssigned) {
+                        isDuplicate = false;
+                        break;
+                    }
+                }
+
+                if (isDuplicate) return true;
+            }
+            return false;
+        }
+
+        // 스케줄 네비게이션
+        function updateScheduleNavigation() {
+            const navDiv = document.getElementById('scheduleNavigation');
+            const indicator = document.getElementById('scheduleIndicator');
+
+            if (schedules.length <= 1) {
+                navDiv.style.display = 'none';
+            } else {
+                navDiv.style.display = 'block';
+                indicator.textContent = `${currentScheduleIndex + 1} / ${schedules.length}`;
+            }
+        }
+
+        function prevSchedule() {
+            if (currentScheduleIndex > 0) {
+                currentScheduleIndex--;
+                schedule = schedules[currentScheduleIndex];
+                recalculateCounts();
+                updateScheduleNavigation();
+                renderScheduleGrid();
+                renderStatistics();
+            }
+        }
+
+        function nextSchedule() {
+            if (currentScheduleIndex < schedules.length - 1) {
+                currentScheduleIndex++;
+                schedule = schedules[currentScheduleIndex];
+                recalculateCounts();
+                updateScheduleNavigation();
+                renderScheduleGrid();
+                renderStatistics();
+            }
+        }
+
         // 인원 선택
-        function selectPerson(week, requiredTeam, alreadyAssigned, minGap, maxDutyPerPerson) {
+        function selectPerson(week, requiredTeam, alreadyAssigned, minGap, maxDutyPerPerson, tempSchedule = null) {
+            const scheduleToCheck = tempSchedule || schedule;
             // 선호하는 사람 먼저
             let candidates = people.filter(p => {
                 if (alreadyAssigned.includes(p)) return false;
                 if (requiredTeam && p.team !== requiredTeam) return false;
                 if (p.isOnVacation(week)) return false;
                 if (!p.canTakeMoreDuties(maxDutyPerPerson)) return false;
-                if (!checkMinGap(p.name, week, minGap)) return false;
+                if (!checkMinGap(p.name, week, minGap, scheduleToCheck)) return false;
                 return true;
             });
 
@@ -1122,11 +1297,12 @@
         }
 
         // 최소 간격 체크
-        function checkMinGap(personName, week, minGap) {
-            if (!schedule || schedule.length === 0) return true;
+        function checkMinGap(personName, week, minGap, scheduleToCheck = null) {
+            const targetSchedule = scheduleToCheck || schedule;
+            if (!targetSchedule || targetSchedule.length === 0) return true;
 
-            for (let i = schedule.length - 1; i >= 0; i--) {
-                const entry = schedule[i];
+            for (let i = targetSchedule.length - 1; i >= 0; i--) {
+                const entry = targetSchedule[i];
                 if (entry.assigned.includes(personName)) {
                     const gap = week - entry.week;
                     if (gap < minGap) return false;
