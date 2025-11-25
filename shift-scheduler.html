@@ -798,20 +798,58 @@
             }
         }
 
-        // Day 번호를 날짜로 변환
+        // Day 번호를 날짜로 변환 (평일만 카운트, 토/일 제외)
         function dayToDate(dayNumber) {
             if (!startDate) return null;
             const date = new Date(startDate);
-            date.setDate(date.getDate() + dayNumber - 1);
-            return date;
+            let weekdaysCount = 0;
+
+            while (weekdaysCount < dayNumber) {
+                const dayOfWeek = date.getDay();
+                // 평일인 경우만 카운트 (월=1, 화=2, 수=3, 목=4, 금=5)
+                if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+                    weekdaysCount++;
+                    if (weekdaysCount === dayNumber) {
+                        return new Date(date);
+                    }
+                }
+                date.setDate(date.getDate() + 1);
+            }
+            return null;
         }
 
-        // 날짜를 Day 번호로 변환
-        function dateToDayNumber(date) {
+        // 날짜를 Day 번호로 변환 (평일만 카운트, 토/일 제외)
+        function dateToDayNumber(targetDate) {
             if (!startDate) return null;
-            const diffTime = date - startDate;
-            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-            return diffDays + 1;
+
+            const target = new Date(targetDate);
+            target.setHours(0, 0, 0, 0);
+
+            const start = new Date(startDate);
+            start.setHours(0, 0, 0, 0);
+
+            // 타겟 날짜가 시작 날짜보다 이전이면 null
+            if (target < start) return null;
+
+            // 타겟 날짜가 주말이면 null
+            const targetDayOfWeek = target.getDay();
+            if (targetDayOfWeek === 0 || targetDayOfWeek === 6) return null;
+
+            let weekdaysCount = 0;
+            const current = new Date(start);
+
+            while (current <= target) {
+                const dayOfWeek = current.getDay();
+                // 평일인 경우만 카운트
+                if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+                    weekdaysCount++;
+                }
+                if (current.getTime() === target.getTime()) {
+                    return weekdaysCount;
+                }
+                current.setDate(current.getDate() + 1);
+            }
+            return weekdaysCount;
         }
 
         // 날짜를 YYYY-MM-DD 형식으로 포맷
@@ -858,12 +896,13 @@
                         if (dateStr) {
                             return dateStr >= v.startDate && dateStr <= v.endDate;
                         }
-                        // dayNumber와 startDate로부터 날짜 계산
+                        // dayNumber와 startDate로부터 날짜 계산 (평일만 카운트)
                         if (startDate) {
-                            const checkDate = new Date(startDate);
-                            checkDate.setDate(checkDate.getDate() + dayNumber - 1);
-                            const checkDateStr = formatDate(checkDate);
-                            return checkDateStr >= v.startDate && checkDateStr <= v.endDate;
+                            const checkDate = dayToDate(dayNumber);
+                            if (checkDate) {
+                                const checkDateStr = formatDate(checkDate);
+                                return checkDateStr >= v.startDate && checkDateStr <= v.endDate;
+                            }
                         }
                         return false;
                     }
@@ -879,12 +918,13 @@
                         if (dateStr) {
                             return p.date === dateStr && (type === 'any' || p.type === type || p.type === 'any');
                         }
-                        // dayNumber와 startDate로부터 날짜 계산
+                        // dayNumber와 startDate로부터 날짜 계산 (평일만 카운트)
                         if (startDate) {
-                            const checkDate = new Date(startDate);
-                            checkDate.setDate(checkDate.getDate() + dayNumber - 1);
-                            const checkDateStr = formatDate(checkDate);
-                            return p.date === checkDateStr && (type === 'any' || p.type === type || p.type === 'any');
+                            const checkDate = dayToDate(dayNumber);
+                            if (checkDate) {
+                                const checkDateStr = formatDate(checkDate);
+                                return p.date === checkDateStr && (type === 'any' || p.type === type || p.type === 'any');
+                            }
                         }
                         return false;
                     }
