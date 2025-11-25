@@ -872,14 +872,29 @@
                 });
             }
 
-            hasPreferredDuty(dayNumber, type) {
-                return this.preferredDutyDays.some(p =>
-                    p.day === dayNumber && (type === 'any' || p.type === type || p.type === 'any')
-                );
+            hasPreferredDuty(dayNumber, type, dateStr) {
+                return this.preferredDutyDays.some(p => {
+                    // 날짜 기반 선호 당직 확인
+                    if (p.date) {
+                        if (dateStr) {
+                            return p.date === dateStr && (type === 'any' || p.type === type || p.type === 'any');
+                        }
+                        // dayNumber와 startDate로부터 날짜 계산
+                        if (startDate) {
+                            const checkDate = new Date(startDate);
+                            checkDate.setDate(checkDate.getDate() + dayNumber - 1);
+                            const checkDateStr = formatDate(checkDate);
+                            return p.date === checkDateStr && (type === 'any' || p.type === type || p.type === 'any');
+                        }
+                        return false;
+                    }
+                    // 기존 Day 기반 (하위 호환성)
+                    return p.day === dayNumber && (type === 'any' || p.type === type || p.type === 'any');
+                });
             }
 
-            addPreferredDuty(day, type) {
-                this.preferredDutyDays.push({ day, type });
+            addPreferredDuty(date, type) {
+                this.preferredDutyDays.push({ date, type });
             }
 
             removePreferredDuty(index) {
@@ -991,7 +1006,7 @@
                 new Person('전병남', ['수', '목'], ['수'], 5, 'normal', [], {}, []),
                 new Person('노현정', ['화', '수'], ['화'], 5, 'normal', [], {}, []),
                 new Person('백지원', [], [], 5, 'limited', [], {}, []),
-                new Person('박수정', ['금', '월'], ['금'], 5, 'normal', [{start: 5, end: 12}], {}, [])
+                new Person('박수정', ['금', '월'], ['금'], 5, 'normal', [], {}, [])
             ];
             renderPersonList();
             showMessage('예시 데이터가 로드되었습니다. (김나영: 1주차 월/수, 2주차 목/금 불가)', 'success');
@@ -1008,8 +1023,8 @@
             const fieldHTML = `
                 <div class="new-preferred-duty-field" id="newPreferredField_${fieldId}" style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; margin-bottom: 10px; padding: 10px; background: white; border-radius: 4px;">
                     <div>
-                        <label style="font-size: 12px; margin: 3px 0;">날짜 (Day)</label>
-                        <input type="number" class="new-preferred-day" data-field-id="${fieldId}" min="1" max="20" placeholder="1-20" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                        <label style="font-size: 12px; margin: 3px 0;">날짜</label>
+                        <input type="date" class="new-preferred-day" data-field-id="${fieldId}" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
                     </div>
                     <div>
                         <label style="font-size: 12px; margin: 3px 0;">유형</label>
@@ -1099,17 +1114,17 @@
                 }
             }
 
-            // Read preferred duty dates
+            // Read preferred duty dates (날짜 기반)
             const preferredDutyDays = [];
             const preferredDayInputs = document.querySelectorAll('.new-preferred-day');
             const preferredTypeInputs = document.querySelectorAll('.new-preferred-type');
 
             for (let i = 0; i < preferredDayInputs.length; i++) {
-                const day = parseInt(preferredDayInputs[i].value);
+                const dateValue = preferredDayInputs[i].value;
                 const type = preferredTypeInputs[i].value;
 
-                if (day && day >= 1 && day <= 20) {
-                    preferredDutyDays.push({ day, type });
+                if (dateValue) {
+                    preferredDutyDays.push({ date: dateValue, type });
                 }
             }
 
@@ -1363,8 +1378,9 @@
                         if (pref.type === 'primary') typeText = '당직';
                         else if (pref.type === 'secondary') typeText = '2nd duty';
                         else typeText = '당직/2nd';
+                        const dateText = pref.date || 'Day ' + pref.day;
                         preferredHTML += '<div class="vacation-item">';
-                        preferredHTML += '<span>⭐ Day ' + pref.day + ': ' + typeText + '</span>';
+                        preferredHTML += '<span>⭐ ' + dateText + ': ' + typeText + '</span>';
                         preferredHTML += '<button class="danger btn-delete-preferred" data-person-index="' + index + '" data-preferred-index="' + pIdx + '" style="padding: 3px 8px; font-size: 12px;">삭제</button>';
                         preferredHTML += '</div>';
                     });
@@ -1502,8 +1518,8 @@
                 html += '<label style="font-size: 11px; margin-bottom: 3px; font-weight: 600;">선호 당직 날짜 추가</label>';
                 html += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">';
                 html += '<div>';
-                html += '<label style="font-size: 10px; margin: 2px 0;">날짜 (Day)</label>';
-                html += '<input type="number" id="prefDay_' + index + '" min="1" max="20" placeholder="1-20" style="width: 100%; padding: 3px; font-size: 11px;">';
+                html += '<label style="font-size: 10px; margin: 2px 0;">날짜</label>';
+                html += '<input type="date" id="prefDay_' + index + '" style="width: 100%; padding: 3px; font-size: 11px;">';
                 html += '</div>';
                 html += '<div>';
                 html += '<label style="font-size: 10px; margin: 2px 0;">유형</label>';
@@ -1633,24 +1649,24 @@
             }
         }
 
-        // Add preferred duty day
+        // Add preferred duty day (날짜 기반)
         function addPreferredDuty(personIndex) {
             const dayInput = document.getElementById(`prefDay_${personIndex}`);
             const typeInput = document.getElementById(`prefType_${personIndex}`);
 
-            const day = parseInt(dayInput.value);
+            const dateValue = dayInput.value;
             const type = typeInput.value;
 
-            if (!day || day < 1 || day > 20) {
-                showMessage('Day는 1부터 20 사이여야 합니다.', 'error');
+            if (!dateValue) {
+                showMessage('날짜를 선택해주세요.', 'error');
                 return;
             }
 
-            people[personIndex].addPreferredDuty(day, type);
+            people[personIndex].addPreferredDuty(dateValue, type);
             dayInput.value = '';
             typeInput.value = 'any';
             renderPersonList();
-            showMessage(`${people[personIndex].name}의 선호 당직 날짜가 추가되었습니다. (Day ${day})`, 'success');
+            showMessage(`${people[personIndex].name}의 선호 당직 날짜가 추가되었습니다. (${dateValue})`, 'success');
         }
 
         // Remove preferred duty day
@@ -1663,7 +1679,8 @@
 
             const pref = person.preferredDutyDays[preferredIndex];
             let typeText = pref.type === 'primary' ? '당직' : pref.type === 'secondary' ? '2nd duty' : '당직/2nd';
-            if (confirm(`${person.name}의 선호 당직 (Day ${pref.day}: ${typeText})을 삭제하시겠습니까?`)) {
+            const dateText = pref.date || `Day ${pref.day}`;
+            if (confirm(`${person.name}의 선호 당직 (${dateText}: ${typeText})을 삭제하시겠습니까?`)) {
                 person.preferredDutyDays.splice(preferredIndex, 1);
                 renderPersonList();
                 showMessage('선호 당직 날짜가 삭제되었습니다.', 'success');
