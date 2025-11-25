@@ -725,6 +725,10 @@
                 </div>
             </div>
 
+            <div id="scheduleWarning" class="alert alert-error" style="display: none; font-size: 13px; margin-bottom: 10px;">
+                ⚠️ <strong>사람 정보가 변경되었습니다.</strong> 변경된 정보를 반영하려면 당직표를 다시 생성해주세요.
+            </div>
+
             <div class="button-group">
                 <button onclick="generateSchedule()">🎯 당직표 생성</button>
                 <button onclick="generateMultipleSchedules()">🔄 여러 경우 생성 (5개)</button>
@@ -754,9 +758,26 @@
         let schedules = []; // Multiple schedules storage
         let currentScheduleIndex = 0; // Current schedule being viewed
         let startDate = null; // Day1의 시작 날짜 (Date 객체)
+        let peopleModifiedAfterSchedule = false; // 당직표 생성 후 사람 정보 변경 여부
         const DAYS_OF_WEEK = ['월', '화', '수', '목', '금'];
         const TOTAL_DAYS = 20;
         const WEEKS = 4;
+
+        // 사람 정보 변경 시 경고 표시
+        function markPeopleModified() {
+            if (schedule || schedules.length > 0) {
+                peopleModifiedAfterSchedule = true;
+                updateScheduleWarning();
+            }
+        }
+
+        // 경고 표시 업데이트
+        function updateScheduleWarning() {
+            const warningEl = document.getElementById('scheduleWarning');
+            if (warningEl) {
+                warningEl.style.display = peopleModifiedAfterSchedule ? 'block' : 'none';
+            }
+        }
 
         // 날짜 관련 함수들
         function updateStartDate() {
@@ -1049,6 +1070,7 @@
                 new Person('박수정', ['금', '월'], ['금'], 5, 'normal', [], {}, [])
             ];
             renderPersonList();
+            markPeopleModified();
             showMessage('예시 데이터가 로드되었습니다. (김나영: 1주차 월/수, 2주차 목/금 불가)', 'success');
         }
 
@@ -1208,6 +1230,7 @@
             document.getElementById('newPersonVacations').innerHTML = '';
 
             renderPersonList();
+            markPeopleModified();
             showMessage(`${name} 님이 추가되었습니다.`, 'success');
         }
 
@@ -1217,6 +1240,7 @@
             if (confirm(person.name + ' 님을 삭제하시겠습니까?')) {
                 people.splice(index, 1);
                 renderPersonList();
+                markPeopleModified();
                 showMessage('인원이 삭제되었습니다.', 'info');
             }
         }
@@ -1226,7 +1250,10 @@
             if (confirm('모든 인원 데이터를 삭제하시겠습니까?')) {
                 people = [];
                 schedule = null;
+                schedules = [];
                 startDate = null;
+                peopleModifiedAfterSchedule = false;
+                updateScheduleWarning();
                 document.getElementById('startDateInput').value = '';
                 document.getElementById('dateRangeDisplay').textContent = '';
                 renderPersonList();
@@ -1341,6 +1368,7 @@
                     }
 
                     renderPersonList();
+                    markPeopleModified();
                     showMessage(`사람 정보를 불러왔습니다. (${people.length}명)`, 'success');
                 } catch (error) {
                     showMessage('파일 읽기 실패: ' + error.message, 'error');
@@ -1629,6 +1657,7 @@
 
             people[personIndex].addWeeklyRestriction(weekNum, unavailableDays, alternativeDays);
             renderPersonList();
+            markPeopleModified();
             showMessage(`${people[personIndex].name}의 ${weekNum}주차 제약이 추가되었습니다.`, 'success');
         }
 
@@ -1643,6 +1672,7 @@
             if (confirm(`${person.name}의 ${weekNum}주차 제약을 삭제하시겠습니까?`)) {
                 delete person.weeklyRestrictions[weekNum];
                 renderPersonList();
+                markPeopleModified();
                 showMessage('주별 제약이 삭제되었습니다.', 'success');
             }
         }
@@ -1669,6 +1699,7 @@
             startInput.value = '';
             endInput.value = '';
             renderPersonList();
+            markPeopleModified();
             showMessage(`${people[personIndex].name}의 휴가가 추가되었습니다. (${startDate} ~ ${endDate})`, 'success');
         }
 
@@ -1685,6 +1716,7 @@
             if (confirm(person.name + '의 휴가 (' + vacText + ')를 삭제하시겠습니까?')) {
                 person.vacations.splice(vacationIndex, 1);
                 renderPersonList();
+                markPeopleModified();
                 showMessage('휴가가 삭제되었습니다.', 'success');
             }
         }
@@ -1706,6 +1738,7 @@
             dayInput.value = '';
             typeInput.value = 'any';
             renderPersonList();
+            markPeopleModified();
             showMessage(`${people[personIndex].name}의 선호 당직 날짜가 추가되었습니다. (${dateValue})`, 'success');
         }
 
@@ -1723,6 +1756,7 @@
             if (confirm(`${person.name}의 선호 당직 (${dateText}: ${typeText})을 삭제하시겠습니까?`)) {
                 person.preferredDutyDays.splice(preferredIndex, 1);
                 renderPersonList();
+                markPeopleModified();
                 showMessage('선호 당직 날짜가 삭제되었습니다.', 'success');
             }
         }
@@ -1912,6 +1946,8 @@
             showMessage(`당직표가 성공적으로 생성되었습니다! (${attempts}번 시도)`, 'success');
             schedules = [schedule];
             currentScheduleIndex = 0;
+            peopleModifiedAfterSchedule = false;
+            updateScheduleWarning();
             document.getElementById('scheduleNavigation').style.display = 'none';
             renderCalendar();
             renderStatistics();
@@ -2083,6 +2119,8 @@
             // Recalculate counts for display
             recalculateCounts();
 
+            peopleModifiedAfterSchedule = false;
+            updateScheduleWarning();
             showMessage(`${schedules.length}개의 다른 당직표가 생성되었습니다! (총 ${totalAttempts}번 시도)`, 'success');
             document.getElementById('scheduleNavigation').style.display = 'block';
             updateScheduleInfo();
@@ -2552,6 +2590,7 @@
             person.alternativeDays = newAlternativeDays;
 
             renderPersonList();
+            markPeopleModified();
             showMessage(`${person.name}님의 정보가 수정되었습니다.`, 'success');
         }
     </script>
