@@ -86,6 +86,72 @@
             box-shadow: 0 0 10px rgba(52, 152, 219, 0.3);
         }
 
+        .person-entry:not(.edit-mode) {
+            cursor: pointer;
+        }
+
+        .person-entry:not(.edit-mode):hover {
+            background: #f8f9fa;
+        }
+
+        .edit-form-header {
+            background: #3498db;
+            color: white;
+            padding: 8px 12px;
+            margin: -12px -12px 12px -12px;
+            border-radius: 3px 3px 0 0;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .edit-form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .edit-form-field {
+            margin-bottom: 12px;
+        }
+
+        .edit-form-field label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin: 0 0 4px 0;
+            display: block;
+        }
+
+        .edit-form-field input,
+        .edit-form-field select {
+            width: 100%;
+            padding: 8px;
+            font-size: 13px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .edit-form-field input:focus,
+        .edit-form-field select:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 5px rgba(52, 152, 219, 0.3);
+        }
+
+        .edit-form-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 15px;
+        }
+
+        .edit-form-buttons button {
+            flex: 1;
+            padding: 10px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
         .person-entry h3 {
             margin: 0 0 8px 0;
             color: #2c3e50;
@@ -720,56 +786,60 @@
                 const editModeClass = isEditing ? 'edit-mode' : '';
 
                 if (isEditing) {
-                    // 편집 모드
+                    // 편집 모드 - 개선된 폼
                     html += `
                         <div class="person-entry ${teamClass} ${editModeClass}" id="person_${originalIndex}">
-                            <div style="margin-bottom: 12px;">
-                                <label style="font-size: 12px; margin: 0 0 4px 0; display: block;">이름</label>
-                                <input type="text" id="editName_${originalIndex}" value="${person.name}" style="width: 100%; padding: 6px; font-size: 13px;">
+                            <div class="edit-form-header">✏️ ${person.name} 정보 수정</div>
+
+                            <div class="edit-form-row">
+                                <div class="edit-form-field">
+                                    <label>이름</label>
+                                    <input type="text" id="editName_${originalIndex}" value="${person.name}" onkeydown="handleEditKeydown(event, ${originalIndex})">
+                                </div>
+                                <div class="edit-form-field">
+                                    <label>팀</label>
+                                    <select id="editTeam_${originalIndex}">
+                                        <option value="A" ${person.team === 'A' ? 'selected' : ''}>A팀</option>
+                                        <option value="B" ${person.team === 'B' ? 'selected' : ''}>B팀</option>
+                                    </select>
+                                </div>
                             </div>
-                            <div style="margin-bottom: 12px;">
-                                <label style="font-size: 12px; margin: 0 0 4px 0; display: block;">팀</label>
-                                <select id="editTeam_${originalIndex}" style="width: 100%; padding: 6px; font-size: 13px;">
-                                    <option value="A" ${person.team === 'A' ? 'selected' : ''}>A팀</option>
-                                    <option value="B" ${person.team === 'B' ? 'selected' : ''}>B팀</option>
-                                </select>
+
+                            <div class="edit-form-field">
+                                <label>🌟 선호 주차 (쉼표로 구분, 예: 1, 5, 9)</label>
+                                <input type="text" id="editPreferred_${originalIndex}" value="${person.preferredWeeks.join(', ')}" placeholder="선호하는 주차 입력" onkeydown="handleEditKeydown(event, ${originalIndex})">
                             </div>
-                            <div style="margin-bottom: 12px;">
-                                <label style="font-size: 12px; margin: 0 0 4px 0; display: block;">선호 주차 (쉼표로 구분)</label>
-                                <input type="text" id="editPreferred_${originalIndex}" value="${person.preferredWeeks.join(', ')}" placeholder="예: 1, 5, 9" style="width: 100%; padding: 6px; font-size: 13px;">
+
+                            <div class="edit-form-field">
+                                <label>🏖️ 휴가 주차 (쉼표로 구분, 예: 3, 7)</label>
+                                <input type="text" id="editVacation_${originalIndex}" value="${person.vacationWeeks.join(', ')}" placeholder="휴가 주차 입력" onkeydown="handleEditKeydown(event, ${originalIndex})">
                             </div>
-                            <div style="margin-bottom: 12px;">
-                                <label style="font-size: 12px; margin: 0 0 4px 0; display: block;">휴가 주차 (쉼표로 구분)</label>
-                                <input type="text" id="editVacation_${originalIndex}" value="${person.vacationWeeks.join(', ')}" placeholder="예: 3, 7" style="width: 100%; padding: 6px; font-size: 13px;">
-                            </div>
-                            <div style="display: flex; gap: 8px;">
-                                <button onclick="savePersonEdit(${originalIndex})" style="flex: 1; padding: 6px 12px; font-size: 12px; background: #27ae60;">💾 저장</button>
-                                <button onclick="cancelPersonEdit()" class="secondary" style="flex: 1; padding: 6px 12px; font-size: 12px;">취소</button>
+
+                            <div class="edit-form-buttons">
+                                <button onclick="savePersonEdit(${originalIndex})" style="background: #27ae60;">✓ 저장</button>
+                                <button onclick="cancelPersonEdit()" class="secondary">✕ 취소</button>
+                                <button onclick="confirmRemovePerson(${originalIndex})" class="danger">🗑️ 삭제</button>
                             </div>
                         </div>
                     `;
                 } else {
-                    // 표시 모드
+                    // 표시 모드 - 카드 클릭시 편집
                     let tagsHtml = '';
                     if (person.preferredWeeks.length > 0) {
-                        tagsHtml += `<span class="tag preferred">선호: ${person.preferredWeeks.join(', ')}주</span>`;
+                        tagsHtml += `<span class="tag preferred">🌟 선호: ${person.preferredWeeks.join(', ')}주</span>`;
                     }
                     if (person.vacationWeeks.length > 0) {
-                        tagsHtml += `<span class="tag vacation">휴가: ${person.vacationWeeks.join(', ')}주</span>`;
+                        tagsHtml += `<span class="tag vacation">🏖️ 휴가: ${person.vacationWeeks.join(', ')}주</span>`;
                     }
 
                     html += `
-                        <div class="person-entry ${teamClass}" id="person_${originalIndex}">
+                        <div class="person-entry ${teamClass}" id="person_${originalIndex}" onclick="togglePersonEditMode(${originalIndex})" title="클릭하여 수정">
                             <h3>
                                 ${person.name}
                                 <span class="team-badge ${teamClass}">${person.team}팀</span>
                             </h3>
                             <div class="person-compact-info">
-                                ${tagsHtml || '<span class="small-text">제약 없음</span>'}
-                            </div>
-                            <div style="margin-top: 8px;">
-                                <button onclick="togglePersonEditMode(${originalIndex})" class="secondary" style="padding: 4px 8px; font-size: 11px;">✏️ 수정</button>
-                                <button onclick="removePerson(${originalIndex})" class="danger" style="padding: 4px 8px; font-size: 11px;">🗑️ 삭제</button>
+                                ${tagsHtml || '<span class="small-text">제약 없음 - 클릭하여 추가</span>'}
                             </div>
                         </div>
                     `;
@@ -787,12 +857,42 @@
             }
             editingPersonIndex = index;
             renderPersonList();
+
+            // 첫 번째 입력 필드에 포커스
+            setTimeout(() => {
+                const nameInput = document.getElementById(`editName_${index}`);
+                if (nameInput) nameInput.focus();
+            }, 100);
         }
 
         // 인원 편집 취소
         function cancelPersonEdit() {
             editingPersonIndex = null;
             renderPersonList();
+        }
+
+        // 키보드 이벤트 핸들러 (Enter: 저장, Escape: 취소)
+        function handleEditKeydown(event, index) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                savePersonEdit(index);
+            } else if (event.key === 'Escape') {
+                event.preventDefault();
+                cancelPersonEdit();
+            }
+        }
+
+        // 삭제 확인
+        function confirmRemovePerson(index) {
+            event.stopPropagation(); // 카드 클릭 이벤트 방지
+            const name = people[index].name;
+            if (confirm(`${name}님을 삭제하시겠습니까?`)) {
+                people.splice(index, 1);
+                editingPersonIndex = null;
+                renderPersonList();
+                markPeopleModified();
+                showMessage(`${name}님이 삭제되었습니다.`, 'success');
+            }
         }
 
         // 인원 편집 저장
