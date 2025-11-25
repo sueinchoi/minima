@@ -81,6 +81,11 @@
             box-shadow: 0 2px 6px rgba(0,0,0,0.15);
         }
 
+        .person-entry.edit-mode {
+            border: 2px solid #3498db;
+            box-shadow: 0 0 10px rgba(52, 152, 219, 0.3);
+        }
+
         .person-entry h3 {
             margin: 0 0 8px 0;
             color: #2c3e50;
@@ -517,6 +522,7 @@
         let schedule = null;
         let mixedTeamWeeks = new Set(); // 혼합팀 주차
         let editingWeekIndex = null;
+        let editingPersonIndex = null; // 현재 편집 중인 인원 인덱스
         let peopleModifiedAfterSchedule = false;
 
         // Person 클래스
@@ -710,56 +716,113 @@
             sortedPeople.forEach((person, sortedIndex) => {
                 const originalIndex = people.indexOf(person);
                 const teamClass = person.team === 'A' ? 'team-a' : 'team-b';
+                const isEditing = editingPersonIndex === originalIndex;
+                const editModeClass = isEditing ? 'edit-mode' : '';
 
-                let tagsHtml = '';
-                if (person.preferredWeeks.length > 0) {
-                    tagsHtml += `<span class="tag preferred">선호: ${person.preferredWeeks.join(', ')}주</span>`;
-                }
-                if (person.vacationWeeks.length > 0) {
-                    tagsHtml += `<span class="tag vacation">휴가: ${person.vacationWeeks.join(', ')}주</span>`;
-                }
+                if (isEditing) {
+                    // 편집 모드
+                    html += `
+                        <div class="person-entry ${teamClass} ${editModeClass}" id="person_${originalIndex}">
+                            <div style="margin-bottom: 12px;">
+                                <label style="font-size: 12px; margin: 0 0 4px 0; display: block;">이름</label>
+                                <input type="text" id="editName_${originalIndex}" value="${person.name}" style="width: 100%; padding: 6px; font-size: 13px;">
+                            </div>
+                            <div style="margin-bottom: 12px;">
+                                <label style="font-size: 12px; margin: 0 0 4px 0; display: block;">팀</label>
+                                <select id="editTeam_${originalIndex}" style="width: 100%; padding: 6px; font-size: 13px;">
+                                    <option value="A" ${person.team === 'A' ? 'selected' : ''}>A팀</option>
+                                    <option value="B" ${person.team === 'B' ? 'selected' : ''}>B팀</option>
+                                </select>
+                            </div>
+                            <div style="margin-bottom: 12px;">
+                                <label style="font-size: 12px; margin: 0 0 4px 0; display: block;">선호 주차 (쉼표로 구분)</label>
+                                <input type="text" id="editPreferred_${originalIndex}" value="${person.preferredWeeks.join(', ')}" placeholder="예: 1, 5, 9" style="width: 100%; padding: 6px; font-size: 13px;">
+                            </div>
+                            <div style="margin-bottom: 12px;">
+                                <label style="font-size: 12px; margin: 0 0 4px 0; display: block;">휴가 주차 (쉼표로 구분)</label>
+                                <input type="text" id="editVacation_${originalIndex}" value="${person.vacationWeeks.join(', ')}" placeholder="예: 3, 7" style="width: 100%; padding: 6px; font-size: 13px;">
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <button onclick="savePersonEdit(${originalIndex})" style="flex: 1; padding: 6px 12px; font-size: 12px; background: #27ae60;">💾 저장</button>
+                                <button onclick="cancelPersonEdit()" class="secondary" style="flex: 1; padding: 6px 12px; font-size: 12px;">취소</button>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    // 표시 모드
+                    let tagsHtml = '';
+                    if (person.preferredWeeks.length > 0) {
+                        tagsHtml += `<span class="tag preferred">선호: ${person.preferredWeeks.join(', ')}주</span>`;
+                    }
+                    if (person.vacationWeeks.length > 0) {
+                        tagsHtml += `<span class="tag vacation">휴가: ${person.vacationWeeks.join(', ')}주</span>`;
+                    }
 
-                html += `
-                    <div class="person-entry ${teamClass}" id="person_${originalIndex}">
-                        <h3>
-                            ${person.name}
-                            <span class="team-badge ${teamClass}">${person.team}팀</span>
-                        </h3>
-                        <div class="person-compact-info">
-                            ${tagsHtml || '<span class="small-text">제약 없음</span>'}
+                    html += `
+                        <div class="person-entry ${teamClass}" id="person_${originalIndex}">
+                            <h3>
+                                ${person.name}
+                                <span class="team-badge ${teamClass}">${person.team}팀</span>
+                            </h3>
+                            <div class="person-compact-info">
+                                ${tagsHtml || '<span class="small-text">제약 없음</span>'}
+                            </div>
+                            <div style="margin-top: 8px;">
+                                <button onclick="togglePersonEditMode(${originalIndex})" class="secondary" style="padding: 4px 8px; font-size: 11px;">✏️ 수정</button>
+                                <button onclick="removePerson(${originalIndex})" class="danger" style="padding: 4px 8px; font-size: 11px;">🗑️ 삭제</button>
+                            </div>
                         </div>
-                        <div style="margin-top: 8px;">
-                            <button onclick="editPerson(${originalIndex})" class="secondary" style="padding: 4px 8px; font-size: 11px;">✏️ 수정</button>
-                            <button onclick="removePerson(${originalIndex})" class="danger" style="padding: 4px 8px; font-size: 11px;">🗑️ 삭제</button>
-                        </div>
-                    </div>
-                `;
+                    `;
+                }
             });
 
             listDiv.innerHTML = html;
         }
 
-        // 인원 수정
-        function editPerson(index) {
+        // 인원 편집 모드 토글
+        function togglePersonEditMode(index) {
+            if (editingPersonIndex !== null && editingPersonIndex !== index) {
+                // 다른 편집 중이면 먼저 취소
+                editingPersonIndex = null;
+            }
+            editingPersonIndex = index;
+            renderPersonList();
+        }
+
+        // 인원 편집 취소
+        function cancelPersonEdit() {
+            editingPersonIndex = null;
+            renderPersonList();
+        }
+
+        // 인원 편집 저장
+        function savePersonEdit(index) {
             const person = people[index];
-            const newPreferred = prompt(`${person.name}님의 선호 주차 (쉼표로 구분):`, person.preferredWeeks.join(', '));
-            if (newPreferred === null) return;
 
-            const newVacation = prompt(`${person.name}님의 휴가 주차 (쉼표로 구분):`, person.vacationWeeks.join(', '));
-            if (newVacation === null) return;
+            const newName = document.getElementById(`editName_${index}`).value.trim();
+            const newTeam = document.getElementById(`editTeam_${index}`).value;
+            const newPreferredStr = document.getElementById(`editPreferred_${index}`).value.trim();
+            const newVacationStr = document.getElementById(`editVacation_${index}`).value.trim();
 
-            const newTeam = prompt(`${person.name}님의 팀 (A 또는 B):`, person.team);
-            if (newTeam === null) return;
-
-            if (newTeam !== 'A' && newTeam !== 'B') {
-                showMessage('팀은 A 또는 B만 가능합니다.', 'error');
+            // 유효성 검사
+            if (!newName) {
+                showMessage('이름을 입력해주세요.', 'error');
                 return;
             }
 
-            person.preferredWeeks = newPreferred.trim() ? newPreferred.split(',').map(w => parseInt(w.trim())).filter(w => !isNaN(w)) : [];
-            person.vacationWeeks = newVacation.trim() ? newVacation.split(',').map(w => parseInt(w.trim())).filter(w => !isNaN(w)) : [];
-            person.team = newTeam;
+            // 중복 이름 체크 (자기 자신 제외)
+            if (people.some((p, i) => i !== index && p.name === newName)) {
+                showMessage('이미 존재하는 이름입니다.', 'error');
+                return;
+            }
 
+            // 데이터 업데이트
+            person.name = newName;
+            person.team = newTeam;
+            person.preferredWeeks = newPreferredStr ? newPreferredStr.split(',').map(w => parseInt(w.trim())).filter(w => !isNaN(w)) : [];
+            person.vacationWeeks = newVacationStr ? newVacationStr.split(',').map(w => parseInt(w.trim())).filter(w => !isNaN(w)) : [];
+
+            editingPersonIndex = null;
             renderPersonList();
             markPeopleModified();
             showMessage(`${person.name}님의 정보가 수정되었습니다.`, 'success');
