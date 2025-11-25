@@ -429,11 +429,24 @@ title: 병원 당직표 생성기
                 <button onclick="loadSampleData()">📝 예시 데이터 불러오기</button>
                 <button onclick="clearAllData()" class="danger">🗑️ 전체 삭제</button>
             </div>
+
+            <h3 style="margin-top: 20px;">💾 사람 정보 저장/불러오기</h3>
+            <div class="button-group">
+                <button onclick="savePeopleToJson()" class="secondary">📥 사람 정보 저장</button>
+                <button onclick="document.getElementById('loadPeopleFile').click()" class="secondary">📤 사람 정보 불러오기</button>
+                <input type="file" id="loadPeopleFile" accept=".json" style="display:none" onchange="loadPeopleFromJson(event)">
+            </div>
         </div>
 
         <!-- Result Section -->
         <div class="result-section">
             <h2>📅 당직표</h2>
+
+            <div style="background: #e8f4f8; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
+                <label style="font-weight: bold;">📆 당직표 시작 날짜</label>
+                <input type="date" id="scheduleStartDate" style="margin-top: 5px;">
+                <p class="small-text" style="margin-top: 5px;">시작 날짜로부터 4주(평일 20일)의 당직표가 생성됩니다.</p>
+            </div>
 
             <div class="button-group">
                 <button onclick="generateSchedule()">🎯 당직표 생성</button>
@@ -454,9 +467,53 @@ title: 병원 당직표 생성기
         // Global data
         let people = [];
         let schedule = null;
+        let scheduleStartDate = null;  // 당직표 시작 날짜
+        let scheduleDates = [];  // 각 Day에 해당하는 실제 날짜 배열
         const DAYS_OF_WEEK = ['월', '화', '수', '목', '금'];
         const TOTAL_DAYS = 20;
         const WEEKS = 4;
+
+        // 시작 날짜로부터 평일 20일 날짜 배열 생성
+        function generateScheduleDates(startDateStr) {
+            const dates = [];
+            const startDate = new Date(startDateStr);
+            let currentDate = new Date(startDate);
+
+            while (dates.length < TOTAL_DAYS) {
+                const dayOfWeek = currentDate.getDay();
+                // 평일만 (월=1, 화=2, 수=3, 목=4, 금=5)
+                if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+                    dates.push({
+                        date: new Date(currentDate),
+                        dateStr: currentDate.toISOString().split('T')[0],
+                        dayNumber: dates.length + 1,
+                        dayOfWeek: DAYS_OF_WEEK[dayOfWeek - 1],
+                        weekNumber: Math.floor(dates.length / 5) + 1
+                    });
+                }
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+            return dates;
+        }
+
+        // 날짜가 스케줄 범위 내 평일인지 확인하고 Day 번호 반환
+        function getDateToDayNumber(dateStr) {
+            if (!scheduleDates || scheduleDates.length === 0) return null;
+            const found = scheduleDates.find(d => d.dateStr === dateStr);
+            return found ? found.dayNumber : null;
+        }
+
+        // Day 번호로 날짜 정보 가져오기
+        function getDayNumberToDate(dayNumber) {
+            if (!scheduleDates || scheduleDates.length === 0) return null;
+            return scheduleDates.find(d => d.dayNumber === dayNumber);
+        }
+
+        // 날짜 포맷팅 (YYYY-MM-DD → MM/DD)
+        function formatDateShort(dateStr) {
+            const parts = dateStr.split('-');
+            return `${parseInt(parts[1])}/${parseInt(parts[2])}`;
+        }
 
         // Person class
         class Person {
@@ -472,15 +529,26 @@ title: 병원 당직표 생성기
                 this.secondaryCount = 0;
             }
 
-            isOnVacation(dayNumber) {
+            isOnVacation(dayNumber, dateStr) {
+                // 날짜 기반 휴가 확인
+                if (dateStr) {
+                    return this.vacations.some(v => {
+                        if (v.startDate && v.endDate) {
+                            return dateStr >= v.startDate && dateStr <= v.endDate;
+                        }
+                        // 하위 호환성: 기존 Day 기반 데이터 지원
+                        return dayNumber >= v.start && dayNumber <= v.end;
+                    });
+                }
+                // Day 번호 기반 (하위 호환성)
                 return this.vacations.some(v => dayNumber >= v.start && dayNumber <= v.end);
             }
 
-            canDoPrimaryDuty(dayOfWeek, dayNumber, weekNumber) {
+            canDoPrimaryDuty(dayOfWeek, dayNumber, weekNumber, dateStr) {
                 // 2nd duty only staff cannot do primary duty
                 if (this.secondDutyPref === '2nd-only') return false;
 
-                if (this.isOnVacation(dayNumber)) return false;
+                if (this.isOnVacation(dayNumber, dateStr)) return false;
 
                 // Check general unavailable days (applies to all weeks)
                 if (this.unavailableDays.includes(dayOfWeek)) return false;
@@ -496,8 +564,8 @@ title: 병원 당직표 생성기
                 return true;
             }
 
-            canDoSecondaryDuty(dayOfWeek, dayNumber, weekNumber) {
-                if (this.isOnVacation(dayNumber)) return false;
+            canDoSecondaryDuty(dayOfWeek, dayNumber, weekNumber, dateStr) {
+                if (this.isOnVacation(dayNumber, dateStr)) return false;
 
                 // Check week-specific restrictions first
                 if (weekNumber && this.weeklyRestrictions[weekNumber]) {
@@ -533,8 +601,8 @@ title: 병원 당직표 생성기
                 return this.getTotalDuties() < this.maxDuties;
             }
 
-            addVacation(start, end) {
-                this.vacations.push({ start, end });
+            addVacation(startDate, endDate) {
+                this.vacations.push({ startDate, endDate });
             }
 
             removeVacation(index) {
@@ -572,7 +640,7 @@ title: 병원 당직표 생성기
                 new Person('전병남', ['수', '목'], ['수'], 5, 'normal', [], {}),
                 new Person('노현정', ['화', '수'], ['화'], 5, 'normal', [], {}),
                 new Person('백지원', [], [], 5, 'limited', [], {}),
-                new Person('박수정', ['금', '월'], ['금'], 5, 'normal', [{start: 5, end: 12}], {})
+                new Person('박수정', ['금', '월'], ['금'], 5, 'normal', [{startDate: '2025-01-06', endDate: '2025-01-15'}], {})
             ];
             renderPersonList();
             showMessage('예시 데이터가 로드되었습니다. (김나영: 1주차 월/수, 2주차 목/금 불가)', 'success');
@@ -651,9 +719,10 @@ title: 병원 당직표 생성기
                 if (person.vacations && person.vacations.length > 0) {
                     vacationHTML = '<div class="vacation-list">';
                     person.vacations.forEach((vacation, vIdx) => {
+                        const vacText = vacation.startDate ? `${vacation.startDate} ~ ${vacation.endDate}` : `Day ${vacation.start} ~ ${vacation.end}`;
                         vacationHTML += `
                             <div class="vacation-item">
-                                <span>🏖️ Day ${vacation.start} ~ ${vacation.end}</span>
+                                <span>🏖️ ${vacText}</span>
                                 <button onclick="removeVacation(${index}, ${vIdx})" class="danger" style="padding: 3px 8px; font-size: 12px;">삭제</button>
                             </div>
                         `;
@@ -727,11 +796,11 @@ title: 병원 당직표 생성기
                         </div>
 
                         <div class="vacation-form">
-                            <label style="font-size: 13px; margin-bottom: 5px;">휴가 추가</label>
+                            <label style="font-size: 13px; margin-bottom: 5px;">휴가 추가 (날짜 기준)</label>
                             <div class="day-range-input">
-                                <input type="number" id="vacStart_${index}" min="1" max="20" placeholder="시작일">
+                                <input type="date" id="vacStart_${index}" placeholder="시작일">
                                 <span>~</span>
-                                <input type="number" id="vacEnd_${index}" min="1" max="20" placeholder="종료일">
+                                <input type="date" id="vacEnd_${index}" placeholder="종료일">
                             </div>
                             <button onclick="addVacation(${index})" style="padding: 6px 12px; font-size: 13px; margin-top: 5px;">휴가 추가</button>
                         </div>
@@ -785,27 +854,24 @@ title: 병원 당직표 생성기
             const startInput = document.getElementById(`vacStart_${personIndex}`);
             const endInput = document.getElementById(`vacEnd_${personIndex}`);
 
-            const start = parseInt(startInput.value);
-            const end = parseInt(endInput.value);
+            const startDate = startInput.value;
+            const endDate = endInput.value;
 
-            if (!start || !end) {
+            if (!startDate || !endDate) {
                 showMessage('휴가 시작일과 종료일을 모두 입력해주세요.', 'error');
                 return;
             }
 
-            if (start < 1 || start > 20 || end < 1 || end > 20) {
-                showMessage('Day는 1부터 20 사이여야 합니다.', 'error');
-                return;
-            }
-
-            if (start > end) {
+            if (startDate > endDate) {
                 showMessage('시작일은 종료일보다 이전이어야 합니다.', 'error');
                 return;
             }
 
-            people[personIndex].addVacation(start, end);
+            people[personIndex].addVacation(startDate, endDate);
+            startInput.value = '';
+            endInput.value = '';
             renderPersonList();
-            showMessage(`${people[personIndex].name}의 휴가가 추가되었습니다. (Day ${start} ~ ${end})`, 'success');
+            showMessage(`${people[personIndex].name}의 휴가가 추가되었습니다. (${startDate} ~ ${endDate})`, 'success');
         }
 
         // Remove vacation
@@ -827,7 +893,8 @@ title: 병원 당직표 생성기
                 return;
             }
 
-            if (confirm(`${person.name}의 휴가 (Day ${vacation.start} ~ ${vacation.end})를 삭제하시겠습니까?`)) {
+            const vacationText = vacation.startDate ? `${vacation.startDate} ~ ${vacation.endDate}` : `Day ${vacation.start} ~ ${vacation.end}`;
+            if (confirm(`${person.name}의 휴가 (${vacationText})를 삭제하시겠습니까?`)) {
                 person.vacations.splice(vacationIndex, 1);
                 renderPersonList();
                 showMessage('휴가가 삭제되었습니다.', 'success');
@@ -840,6 +907,25 @@ title: 병원 당직표 생성기
                 showMessage('인원을 먼저 추가해주세요.', 'error');
                 return;
             }
+
+            // 시작 날짜 확인
+            const startDateInput = document.getElementById('scheduleStartDate').value;
+            if (!startDateInput) {
+                showMessage('당직표 시작 날짜를 선택해주세요.', 'error');
+                return;
+            }
+
+            // 시작 날짜가 월요일인지 확인
+            const startDate = new Date(startDateInput);
+            const dayOfWeekNum = startDate.getDay();
+            if (dayOfWeekNum !== 1) {
+                showMessage('시작 날짜는 월요일이어야 합니다.', 'error');
+                return;
+            }
+
+            // 날짜 배열 생성
+            scheduleStartDate = startDateInput;
+            scheduleDates = generateScheduleDates(startDateInput);
 
             // Reset counts
             people.forEach(p => {
@@ -866,14 +952,15 @@ title: 병원 당직표 생성기
                 success = true;
 
                 for (let day = 0; day < TOTAL_DAYS; day++) {
-                    const week = Math.floor(day / 5);
-                    const weekNumber = week + 1;
-                    const dayOfWeek = DAYS_OF_WEEK[day % 5];
-                    const dayNumber = day + 1;
+                    const dateInfo = scheduleDates[day];
+                    const weekNumber = dateInfo.weekNumber;
+                    const dayOfWeek = dateInfo.dayOfWeek;
+                    const dayNumber = dateInfo.dayNumber;
+                    const dateStr = dateInfo.dateStr;
 
                     // Find primary duty
                     const primaryCandidates = people.filter(p =>
-                        p.canDoPrimaryDuty(dayOfWeek, dayNumber, weekNumber) &&
+                        p.canDoPrimaryDuty(dayOfWeek, dayNumber, weekNumber, dateStr) &&
                         p.canTakeMoreDuties() &&
                         !isConsecutive(schedule, p.name, day)
                     ).sort((a, b) => a.primaryCount - b.primaryCount);
@@ -888,7 +975,7 @@ title: 병원 당직표 생성기
                     // Find secondary duty
                     const secondaryCandidates = people.filter(p =>
                         p !== primary &&
-                        p.canDoSecondaryDuty(dayOfWeek, dayNumber, weekNumber) &&
+                        p.canDoSecondaryDuty(dayOfWeek, dayNumber, weekNumber, dateStr) &&
                         (p.secondDutyPref === 'preferred' ||
                          (p.secondDutyPref === '2nd-only' && p.canTakeMoreDuties()) ||
                          (p.secondDutyPref === 'limited' && p.secondaryCount < 1) ||
@@ -914,6 +1001,7 @@ title: 병원 당직표 생성기
                         day: dayNumber,
                         week: weekNumber,
                         dayOfWeek: dayOfWeek,
+                        dateStr: dateStr,
                         primary: primary.name,
                         secondary: secondary.name
                     });
@@ -959,7 +1047,7 @@ title: 병원 당직표 생성기
             let html = '<div class="calendar">';
             schedule.forEach((day, index) => {
                 // Check who is on vacation this day
-                const vacationers = people.filter(p => p.isOnVacation(day.day))
+                const vacationers = people.filter(p => p.isOnVacation(day.day, day.dateStr))
                     .map(p => p.name);
 
                 let vacationHTML = '';
@@ -973,12 +1061,15 @@ title: 병원 당직표 생성기
                 const editModeClass = isEditing ? 'edit-mode' : '';
                 const manualBadge = day.manuallyEdited ? '<div class="manual-edit-badge">수정됨</div>' : '';
 
+                // 날짜 표시 형식
+                const dateDisplay = day.dateStr ? formatDateShort(day.dateStr) : `Day ${day.day}`;
+
                 let contentHTML = '';
                 if (isEditing) {
                     // Edit mode
                     contentHTML = `
                         <div class="day-header">
-                            <span class="day-number">Day ${day.day}</span> ${day.dayOfWeek}요일
+                            <span class="day-number">${dateDisplay}</span> ${day.dayOfWeek}
                         </div>
                         <div class="edit-controls">
                             <label style="font-size: 12px; margin: 0;">당직 (Primary)</label>
@@ -999,7 +1090,7 @@ title: 병원 당직표 생성기
                     // Display mode
                     contentHTML = `
                         <div class="day-header">
-                            <span class="day-number">Day ${day.day}</span> ${day.dayOfWeek}요일
+                            <span class="day-number">${dateDisplay}</span> ${day.dayOfWeek}
                         </div>
                         <div class="duty-assignment">
                             <div class="duty-primary">🔴 ${day.primary}</div>
@@ -1129,14 +1220,19 @@ title: 병원 당직표 생성기
                 return;
             }
 
-            let text = '병원 당직표\n\n';
+            let text = '병원 당직표\n';
+            if (scheduleStartDate) {
+                text += `기간: ${scheduleStartDate} 부터 4주\n`;
+            }
+            text += '\n';
 
             // Schedule
             schedule.forEach(day => {
-                const vacationers = people.filter(p => p.isOnVacation(day.day)).map(p => p.name);
+                const vacationers = people.filter(p => p.isOnVacation(day.day, day.dateStr)).map(p => p.name);
                 let vacInfo = vacationers.length > 0 ? ` (휴가: ${vacationers.join(', ')})` : '';
                 let editInfo = day.manuallyEdited ? ' [수동편집]' : '';
-                text += `Day ${day.day} (${day.dayOfWeek}): 당직 ${day.primary}, 2nd ${day.secondary}${vacInfo}${editInfo}\n`;
+                const dateDisplay = day.dateStr ? `${day.dateStr} (${day.dayOfWeek})` : `Day ${day.day} (${day.dayOfWeek})`;
+                text += `${dateDisplay}: 당직 ${day.primary}, 2nd ${day.secondary}${vacInfo}${editInfo}\n`;
             });
 
             // Statistics
@@ -1144,7 +1240,10 @@ title: 병원 당직표 생성기
             people.forEach(person => {
                 let vacText = '';
                 if (person.vacations && person.vacations.length > 0) {
-                    const vacList = person.vacations.map(v => `Day ${v.start}-${v.end}`).join(', ');
+                    const vacList = person.vacations.map(v => {
+                        if (v.startDate) return `${v.startDate}~${v.endDate}`;
+                        return `Day ${v.start}-${v.end}`;
+                    }).join(', ');
                     vacText = ` (휴가: ${vacList})`;
                 }
 
@@ -1167,7 +1266,8 @@ title: 병원 당직표 생성기
             if (manualEdits.length > 0) {
                 text += '\n수동 편집된 날짜:\n';
                 manualEdits.forEach(day => {
-                    text += `- Day ${day.day} (${day.dayOfWeek})\n`;
+                    const dateDisplay = day.dateStr || `Day ${day.day}`;
+                    text += `- ${dateDisplay} (${day.dayOfWeek})\n`;
                 });
             }
 
@@ -1180,6 +1280,72 @@ title: 병원 당직표 생성기
             URL.revokeObjectURL(url);
 
             showMessage('당직표가 다운로드되었습니다.', 'success');
+        }
+
+        // Save people data to JSON
+        function savePeopleToJson() {
+            if (people.length === 0) {
+                showMessage('저장할 인원 정보가 없습니다.', 'error');
+                return;
+            }
+
+            const data = people.map(p => ({
+                name: p.name,
+                unavailableDays: p.unavailableDays,
+                alternativeDays: p.alternativeDays,
+                maxDuties: p.maxDuties,
+                secondDutyPref: p.secondDutyPref,
+                vacations: p.vacations,
+                weeklyRestrictions: p.weeklyRestrictions
+            }));
+
+            const json = JSON.stringify(data, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = '인원정보_' + new Date().toISOString().slice(0, 10) + '.json';
+            a.click();
+            URL.revokeObjectURL(url);
+
+            showMessage('인원 정보가 저장되었습니다.', 'success');
+        }
+
+        // Load people data from JSON
+        function loadPeopleFromJson(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+
+                    if (!Array.isArray(data)) {
+                        showMessage('올바른 인원 정보 파일이 아닙니다.', 'error');
+                        return;
+                    }
+
+                    people = data.map(p => new Person(
+                        p.name,
+                        p.unavailableDays || [],
+                        p.alternativeDays || [],
+                        p.maxDuties || 5,
+                        p.secondDutyPref || 'normal',
+                        p.vacations || [],
+                        p.weeklyRestrictions || {}
+                    ));
+
+                    renderPersonList();
+                    showMessage(`${people.length}명의 인원 정보가 불러와졌습니다.`, 'success');
+                } catch (err) {
+                    showMessage('파일을 읽는 중 오류가 발생했습니다: ' + err.message, 'error');
+                }
+            };
+            reader.readAsText(file);
+
+            // 파일 input 초기화 (같은 파일 다시 선택 가능하도록)
+            event.target.value = '';
         }
 
         // Initialize
