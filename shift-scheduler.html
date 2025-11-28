@@ -736,7 +736,7 @@
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <label style="font-size: 13px; margin: 0;">🔵 2nd 당직:</label>
-                        <input type="number" id="secondaryCountPerDayInput" value="1" min="1" max="10" style="width: 60px; padding: 6px; font-size: 14px;" onchange="updateDutyCountSettings()">
+                        <input type="number" id="secondaryCountPerDayInput" value="1" min="0" max="10" style="width: 60px; padding: 6px; font-size: 14px;" onchange="updateDutyCountSettings()">
                         <span style="font-size: 13px; color: #666;">명</span>
                     </div>
                     <span id="dutyCountDisplay" style="font-size: 12px; color: #888;">(일별 총 2명)</span>
@@ -792,12 +792,13 @@
             const display = document.getElementById('dutyCountDisplay');
 
             primaryCountPerDay = parseInt(primaryInput.value) || 1;
-            secondaryCountPerDay = parseInt(secondaryInput.value) || 1;
+            const parsedSecondary = parseInt(secondaryInput.value);
+            secondaryCountPerDay = isNaN(parsedSecondary) ? 0 : parsedSecondary;
 
             // 유효 범위 검증
             if (primaryCountPerDay < 1) primaryCountPerDay = 1;
             if (primaryCountPerDay > 10) primaryCountPerDay = 10;
-            if (secondaryCountPerDay < 1) secondaryCountPerDay = 1;
+            if (secondaryCountPerDay < 0) secondaryCountPerDay = 0;
             if (secondaryCountPerDay > 10) secondaryCountPerDay = 10;
 
             primaryInput.value = primaryCountPerDay;
