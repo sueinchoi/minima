@@ -177,23 +177,116 @@
 
         .calendar {
             display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 10px;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
             margin-top: 20px;
+            background: #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .calendar-header-row {
+            display: contents;
+        }
+
+        .calendar-day-header {
+            background: #34495e;
+            color: white;
+            padding: 10px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .calendar-day-header.sunday {
+            background: #c0392b;
+        }
+
+        .calendar-day-header.saturday {
+            background: #2980b9;
         }
 
         .calendar-day {
-            border: 1px solid #ddd;
-            padding: 15px;
-            border-radius: 5px;
+            border: none;
+            padding: 10px;
+            border-radius: 0;
             background: white;
-            min-height: 100px;
+            min-height: 90px;
+            position: relative;
         }
 
-        .calendar-day.week1 { background: #fff5f5; }
-        .calendar-day.week2 { background: #f5f9ff; }
-        .calendar-day.week3 { background: #f5fff5; }
-        .calendar-day.week4 { background: #fffef5; }
+        .calendar-day.empty {
+            background: #f5f5f5;
+        }
+
+        .calendar-day.weekend {
+            background: #f8f9fa;
+        }
+
+        .calendar-day.sunday {
+            background: #fff5f5;
+        }
+
+        .calendar-day.saturday {
+            background: #f5f8ff;
+        }
+
+        .calendar-day.holiday {
+            background: #fff0f0;
+        }
+
+        .calendar-day.week1 { }
+        .calendar-day.week2 { }
+        .calendar-day.week3 { }
+        .calendar-day.week4 { }
+
+        .holiday-name {
+            position: absolute;
+            top: 2px;
+            right: 3px;
+            font-size: 9px;
+            color: #c0392b;
+            font-weight: 600;
+            max-width: 80%;
+            text-align: right;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .day-number-display {
+            font-size: 16px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .day-number-display.sunday {
+            color: #c0392b;
+        }
+
+        .day-number-display.saturday {
+            color: #2980b9;
+        }
+
+        .day-number-display.holiday {
+            color: #c0392b;
+        }
+
+        .preview-calendar {
+            margin-top: 15px;
+        }
+
+        .preview-calendar .calendar-day {
+            min-height: 60px;
+            cursor: default;
+        }
+
+        .preview-calendar .day-info {
+            font-size: 10px;
+            color: #888;
+            margin-top: 3px;
+        }
 
         .day-header {
             font-weight: bold;
@@ -715,14 +808,16 @@
         <div class="result-section">
             <h2>📅 당직표</h2>
 
-            <!-- Day1 날짜 설정 -->
+            <!-- 월 선택 및 캘린더 미리보기 -->
             <div style="background: #f0f8ff; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
-                <label style="font-size: 14px; font-weight: 600; color: #2c3e50; margin-bottom: 8px; display: block;">📆 Day1 시작 날짜 설정</label>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                    <input type="date" id="startDateInput" style="flex: 1; padding: 8px; font-size: 14px;" onchange="updateStartDate()">
-                    <button onclick="clearStartDate()" class="secondary" style="padding: 8px 16px;">초기화</button>
-                    <span id="dateRangeDisplay" style="font-size: 13px; color: #666;"></span>
+                <label style="font-size: 14px; font-weight: 600; color: #2c3e50; margin-bottom: 8px; display: block;">📆 대상 월 선택</label>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <input type="month" id="targetMonthInput" style="padding: 8px; font-size: 14px;" onchange="updateTargetMonth()">
+                    <button onclick="prevMonth()" class="secondary" style="padding: 8px 12px;">◀ 이전달</button>
+                    <button onclick="nextMonth()" class="secondary" style="padding: 8px 12px;">다음달 ▶</button>
+                    <span id="monthInfoDisplay" style="font-size: 13px; color: #666;"></span>
                 </div>
+                <div id="previewCalendar" class="preview-calendar"></div>
             </div>
 
             <!-- 당직 인원 설정 -->
@@ -778,8 +873,89 @@
         let startDate = null; // Day1의 시작 날짜 (Date 객체)
         let peopleModifiedAfterSchedule = false; // 당직표 생성 후 사람 정보 변경 여부
         const DAYS_OF_WEEK = ['월', '화', '수', '목', '금'];
+        const DAYS_OF_WEEK_FULL = ['일', '월', '화', '수', '목', '금', '토'];
         const TOTAL_DAYS = 20;
         const WEEKS = 4;
+
+        // 월별 캘린더 관련
+        let currentYear = new Date().getFullYear();
+        let currentMonth = new Date().getMonth() + 1;
+
+        // 대한민국 공휴일 데이터 (2024-2026)
+        const KOREAN_HOLIDAYS = {
+            // 2024년
+            '2024-01-01': '신정',
+            '2024-02-09': '설날 연휴',
+            '2024-02-10': '설날',
+            '2024-02-11': '설날 연휴',
+            '2024-02-12': '대체공휴일',
+            '2024-03-01': '삼일절',
+            '2024-04-10': '국회의원선거일',
+            '2024-05-05': '어린이날',
+            '2024-05-06': '대체공휴일',
+            '2024-05-15': '부처님오신날',
+            '2024-06-06': '현충일',
+            '2024-08-15': '광복절',
+            '2024-09-16': '추석 연휴',
+            '2024-09-17': '추석',
+            '2024-09-18': '추석 연휴',
+            '2024-10-03': '개천절',
+            '2024-10-09': '한글날',
+            '2024-12-25': '크리스마스',
+            // 2025년
+            '2025-01-01': '신정',
+            '2025-01-28': '설날 연휴',
+            '2025-01-29': '설날',
+            '2025-01-30': '설날 연휴',
+            '2025-03-01': '삼일절',
+            '2025-03-03': '대체공휴일',
+            '2025-05-05': '어린이날',
+            '2025-05-06': '부처님오신날',
+            '2025-06-06': '현충일',
+            '2025-08-15': '광복절',
+            '2025-10-03': '개천절',
+            '2025-10-05': '추석 연휴',
+            '2025-10-06': '추석',
+            '2025-10-07': '추석 연휴',
+            '2025-10-08': '대체공휴일',
+            '2025-10-09': '한글날',
+            '2025-12-25': '크리스마스',
+            // 2026년
+            '2026-01-01': '신정',
+            '2026-02-16': '설날 연휴',
+            '2026-02-17': '설날',
+            '2026-02-18': '설날 연휴',
+            '2026-03-01': '삼일절',
+            '2026-03-02': '대체공휴일',
+            '2026-05-05': '어린이날',
+            '2026-05-24': '부처님오신날',
+            '2026-05-25': '대체공휴일',
+            '2026-06-06': '현충일',
+            '2026-08-15': '광복절',
+            '2026-08-17': '대체공휴일',
+            '2026-09-24': '추석 연휴',
+            '2026-09-25': '추석',
+            '2026-09-26': '추석 연휴',
+            '2026-10-03': '개천절',
+            '2026-10-05': '대체공휴일',
+            '2026-10-09': '한글날',
+            '2026-12-25': '크리스마스'
+        };
+
+        // 공휴일 확인
+        function getHolidayName(year, month, day) {
+            const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            return KOREAN_HOLIDAYS[dateStr] || null;
+        }
+
+        // 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            const today = new Date();
+            currentYear = today.getFullYear();
+            currentMonth = today.getMonth() + 1;
+            document.getElementById('targetMonthInput').value = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+            updateTargetMonth();
+        });
 
         // 일별 당직 인원 설정
         let primaryCountPerDay = 1;  // 일별 당직 인원 수
@@ -824,44 +1000,170 @@
             }
         }
 
-        // 날짜 관련 함수들
-        function updateStartDate() {
-            const input = document.getElementById('startDateInput');
+        // 월 선택 관련 함수들
+        function updateTargetMonth() {
+            const input = document.getElementById('targetMonthInput');
             if (input.value) {
-                startDate = new Date(input.value);
-                updateDateRangeDisplay();
-                if (schedule) {
-                    renderCalendar(schedule);
+                const [year, month] = input.value.split('-');
+                currentYear = parseInt(year);
+                currentMonth = parseInt(month);
+            }
+
+            // startDate를 해당 월의 첫 번째 평일로 설정
+            startDate = getFirstWeekday(currentYear, currentMonth);
+
+            updateMonthInfoDisplay();
+            renderPreviewCalendar();
+
+            // 기존 스케줄 초기화
+            schedule = null;
+            schedules = [];
+            currentScheduleIndex = 0;
+            document.getElementById('calendar').innerHTML = '';
+            document.getElementById('statistics').innerHTML = '';
+        }
+
+        function prevMonth() {
+            currentMonth--;
+            if (currentMonth < 1) {
+                currentMonth = 12;
+                currentYear--;
+            }
+            document.getElementById('targetMonthInput').value = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+            updateTargetMonth();
+        }
+
+        function nextMonth() {
+            currentMonth++;
+            if (currentMonth > 12) {
+                currentMonth = 1;
+                currentYear++;
+            }
+            document.getElementById('targetMonthInput').value = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+            updateTargetMonth();
+        }
+
+        function getFirstWeekday(year, month) {
+            const date = new Date(year, month - 1, 1);
+            while (date.getDay() === 0 || date.getDay() === 6) {
+                date.setDate(date.getDate() + 1);
+            }
+            return date;
+        }
+
+        function updateMonthInfoDisplay() {
+            const display = document.getElementById('monthInfoDisplay');
+            const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+
+            // 해당 월의 평일 수 계산
+            let weekdayCount = 0;
+            for (let d = 1; d <= daysInMonth; d++) {
+                const date = new Date(currentYear, currentMonth - 1, d);
+                const dayOfWeek = date.getDay();
+                if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+                    weekdayCount++;
                 }
-                showMessage('시작 날짜가 설정되었습니다.', 'success');
             }
+
+            // 공휴일 수 계산
+            let holidayCount = 0;
+            for (let d = 1; d <= daysInMonth; d++) {
+                if (getHolidayName(currentYear, currentMonth, d)) {
+                    holidayCount++;
+                }
+            }
+
+            display.textContent = `(평일 ${weekdayCount}일, 공휴일 ${holidayCount}일)`;
         }
 
-        function clearStartDate() {
-            startDate = null;
-            document.getElementById('startDateInput').value = '';
-            document.getElementById('dateRangeDisplay').textContent = '';
-            if (schedule) {
-                renderCalendar(schedule);
+        // 미리보기 캘린더 렌더링
+        function renderPreviewCalendar() {
+            const container = document.getElementById('previewCalendar');
+            const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+            const firstDayOfWeek = new Date(currentYear, currentMonth - 1, 1).getDay();
+
+            let html = '<div class="calendar">';
+
+            // 요일 헤더
+            DAYS_OF_WEEK_FULL.forEach((day, i) => {
+                let headerClass = 'calendar-day-header';
+                if (i === 0) headerClass += ' sunday';
+                if (i === 6) headerClass += ' saturday';
+                html += `<div class="${headerClass}">${day}</div>`;
+            });
+
+            // 빈 칸 (월 시작 전)
+            for (let i = 0; i < firstDayOfWeek; i++) {
+                html += '<div class="calendar-day empty"></div>';
             }
-            showMessage('시작 날짜가 초기화되었습니다.', 'info');
+
+            // 날짜 칸
+            let dayCounter = 0; // 평일 카운터 (당직 Day 번호용)
+            for (let day = 1; day <= daysInMonth; day++) {
+                const date = new Date(currentYear, currentMonth - 1, day);
+                const dayOfWeek = date.getDay();
+                const holidayName = getHolidayName(currentYear, currentMonth, day);
+                const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                const isWeekday = !isWeekend;
+
+                let dayClass = 'calendar-day';
+                let numberClass = 'day-number-display';
+
+                if (dayOfWeek === 0) {
+                    dayClass += ' sunday';
+                    numberClass += ' sunday';
+                } else if (dayOfWeek === 6) {
+                    dayClass += ' saturday';
+                    numberClass += ' saturday';
+                }
+
+                if (holidayName) {
+                    dayClass += ' holiday';
+                    numberClass += ' holiday';
+                }
+
+                // 평일이면 Day 번호 증가
+                if (isWeekday) {
+                    dayCounter++;
+                }
+
+                html += `<div class="${dayClass}">`;
+
+                // 공휴일 이름
+                if (holidayName) {
+                    html += `<div class="holiday-name">${holidayName}</div>`;
+                }
+
+                // 날짜 숫자
+                html += `<div class="${numberClass}">${day}</div>`;
+
+                // 평일이면 Day 번호 표시
+                if (isWeekday && dayCounter <= TOTAL_DAYS) {
+                    html += `<div class="day-info">Day ${dayCounter}</div>`;
+                } else if (isWeekend) {
+                    html += `<div class="day-info" style="color: #ccc;">휴무</div>`;
+                } else if (isWeekday && dayCounter > TOTAL_DAYS) {
+                    html += `<div class="day-info" style="color: #ccc;">범위 외</div>`;
+                }
+
+                html += '</div>';
+            }
+
+            // 빈 칸 (월 끝 후)
+            const totalCells = firstDayOfWeek + daysInMonth;
+            const remainingCells = (7 - (totalCells % 7)) % 7;
+            for (let i = 0; i < remainingCells; i++) {
+                html += '<div class="calendar-day empty"></div>';
+            }
+
+            html += '</div>';
+            container.innerHTML = html;
         }
 
+        // 기존 호환성을 위한 함수들
         function updateDateRangeDisplay() {
-            const display = document.getElementById('dateRangeDisplay');
-            if (startDate) {
-                const endDate = new Date(startDate);
-                endDate.setDate(endDate.getDate() + TOTAL_DAYS - 1);
-                const formatDate = (date) => {
-                    const year = date.getFullYear();
-                    const month = String(date.getMonth() + 1).padStart(2, '0');
-                    const day = String(date.getDate()).padStart(2, '0');
-                    return `${year}-${month}-${day}`;
-                };
-                display.textContent = `(${formatDate(startDate)} ~ ${formatDate(endDate)})`;
-            } else {
-                display.textContent = '';
-            }
+            // 이제 updateMonthInfoDisplay로 대체
+            updateMonthInfoDisplay();
         }
 
         // Day 번호를 날짜로 변환 (평일만 카운트, 토/일 제외)
@@ -2247,7 +2549,13 @@
         // Current editing day
         let editingDayIndex = null;
 
-        // Render calendar
+        // 스케줄의 Day 번호로 인덱스 찾기
+        function findScheduleIndex(dayNumber) {
+            if (!schedule) return -1;
+            return schedule.findIndex(d => d.day === dayNumber);
+        }
+
+        // Render calendar - 7일 그리드 레이아웃으로 변경
         function renderCalendar() {
             const calendarDiv = document.getElementById('calendar');
             if (!schedule || schedule.length === 0) {
@@ -2255,103 +2563,168 @@
                 return;
             }
 
-            let html = '<div class="calendar">';
-            schedule.forEach((day, index) => {
-                // Check who is on vacation this day
-                const vacationers = people.filter(p => p.isOnVacation(day.day))
-                    .map(p => p.name);
+            const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+            const firstDayOfWeek = new Date(currentYear, currentMonth - 1, 1).getDay();
 
-                let vacationHTML = '';
-                if (vacationers.length > 0) {
-                    vacationHTML = `<div class="vacation-indicator">🏖️ ${vacationers.join(', ')}</div>`;
-                }
-
-                const isEditing = editingDayIndex === index;
-                const editableClass = 'editable';
-                const manuallyEditedClass = day.manuallyEdited ? 'manually-edited' : '';
-                const editModeClass = isEditing ? 'edit-mode' : '';
-                const manualBadge = day.manuallyEdited ? '<div class="manual-edit-badge">수정됨</div>' : '';
-
-                // 날짜 표시
-                let dateDisplay = '';
-                if (startDate) {
-                    const currentDate = dayToDate(day.day);
-                    if (currentDate) {
-                        const month = currentDate.getMonth() + 1;
-                        const date = currentDate.getDate();
-                        dateDisplay = ` <span style="font-size: 12px; color: #3498db;">(${month}/${date})</span>`;
+            // Day 번호를 날짜에 매핑
+            const dayToDateMap = {};
+            let dayCounter = 0;
+            for (let d = 1; d <= daysInMonth; d++) {
+                const date = new Date(currentYear, currentMonth - 1, d);
+                const dow = date.getDay();
+                if (dow >= 1 && dow <= 5) { // 평일만
+                    dayCounter++;
+                    if (dayCounter <= TOTAL_DAYS) {
+                        dayToDateMap[d] = dayCounter;
                     }
                 }
+            }
 
-                // 배열 형태와 단일 형태 모두 지원
-                const primaries = Array.isArray(day.primaries) ? day.primaries : [day.primary];
-                const secondaries = Array.isArray(day.secondaries) ? day.secondaries : [day.secondary];
+            let html = '<div class="calendar">';
 
-                let contentHTML = '';
-                if (isEditing) {
-                    // Edit mode - 다중 선택 지원
-                    let primarySelects = '';
-                    primaries.forEach((name, i) => {
-                        primarySelects += `
-                            <div style="margin-bottom: 5px;">
-                                <label style="font-size: 11px; margin: 0;">당직 ${primaries.length > 1 ? (i + 1) : ''}</label>
-                                <select id="editPrimary_${index}_${i}">
-                                    ${people.map(p => `<option value="${p.name}" ${p.name === name ? 'selected' : ''}>${p.name}</option>`).join('')}
-                                </select>
-                            </div>
-                        `;
-                    });
+            // 요일 헤더
+            DAYS_OF_WEEK_FULL.forEach((day, i) => {
+                let headerClass = 'calendar-day-header';
+                if (i === 0) headerClass += ' sunday';
+                if (i === 6) headerClass += ' saturday';
+                html += `<div class="${headerClass}">${day}</div>`;
+            });
 
-                    let secondarySelects = '';
-                    secondaries.forEach((name, i) => {
-                        secondarySelects += `
-                            <div style="margin-bottom: 5px;">
-                                <label style="font-size: 11px; margin: 0;">2nd ${secondaries.length > 1 ? (i + 1) : ''}</label>
-                                <select id="editSecondary_${index}_${i}">
-                                    ${people.map(p => `<option value="${p.name}" ${p.name === name ? 'selected' : ''}>${p.name}</option>`).join('')}
-                                </select>
-                            </div>
-                        `;
-                    });
+            // 빈 칸 (월 시작 전)
+            for (let i = 0; i < firstDayOfWeek; i++) {
+                html += '<div class="calendar-day empty"></div>';
+            }
 
-                    contentHTML = `
-                        <div class="day-header">
-                            <span class="day-number">Day ${day.day}</span> ${day.dayOfWeek}요일${dateDisplay}
-                        </div>
-                        <div class="edit-controls">
-                            ${primarySelects}
-                            ${secondarySelects}
-                            <div>
-                                <button onclick="saveEdit(${index})" style="background: #27ae60;">저장</button>
-                                <button onclick="cancelEdit()" class="secondary">취소</button>
-                            </div>
-                        </div>
-                    `;
-                } else {
-                    // Display mode - 다중 인원 표시
-                    const primaryDisplay = primaries.map(name => `🔴 ${name}`).join('<br>');
-                    const secondaryDisplay = secondaries.map(name => `🔵 ${name}`).join('<br>');
+            // 날짜 칸
+            for (let dateNum = 1; dateNum <= daysInMonth; dateNum++) {
+                const date = new Date(currentYear, currentMonth - 1, dateNum);
+                const dayOfWeek = date.getDay();
+                const holidayName = getHolidayName(currentYear, currentMonth, dateNum);
+                const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                const dayNumber = dayToDateMap[dateNum]; // Day 1, Day 2 등
 
-                    contentHTML = `
-                        <div class="day-header">
-                            <span class="day-number">Day ${day.day}</span> ${day.dayOfWeek}요일${dateDisplay}
-                        </div>
-                        <div class="duty-assignment">
-                            <div class="duty-primary">${primaryDisplay}</div>
-                            <div class="duty-secondary">${secondaryDisplay}</div>
-                        </div>
-                        ${vacationHTML}
-                    `;
+                let dayClass = 'calendar-day';
+                let numberClass = 'day-number-display';
+
+                if (dayOfWeek === 0) {
+                    dayClass += ' sunday';
+                    numberClass += ' sunday';
+                } else if (dayOfWeek === 6) {
+                    dayClass += ' saturday';
+                    numberClass += ' saturday';
                 }
 
-                html += `
-                    <div class="calendar-day week${day.week} ${editableClass} ${manuallyEditedClass} ${editModeClass}"
-                         onclick="${isEditing ? '' : `editDay(${index})`}">
-                        ${manualBadge}
-                        ${contentHTML}
-                    </div>
-                `;
-            });
+                if (holidayName) {
+                    dayClass += ' holiday';
+                    numberClass += ' holiday';
+                }
+
+                // 스케줄 데이터 가져오기
+                const scheduleIndex = dayNumber ? findScheduleIndex(dayNumber) : -1;
+                const dayData = scheduleIndex >= 0 ? schedule[scheduleIndex] : null;
+
+                const isEditing = editingDayIndex === scheduleIndex && scheduleIndex >= 0;
+                const editableClass = dayData ? 'editable' : '';
+                const manuallyEditedClass = dayData?.manuallyEdited ? 'manually-edited' : '';
+                const editModeClass = isEditing ? 'edit-mode' : '';
+
+                html += `<div class="${dayClass} ${editableClass} ${manuallyEditedClass} ${editModeClass}"`;
+
+                if (dayData && !isEditing) {
+                    html += ` onclick="editDay(${scheduleIndex})"`;
+                }
+
+                html += '>';
+
+                // 공휴일 이름
+                if (holidayName) {
+                    html += `<div class="holiday-name">${holidayName}</div>`;
+                }
+
+                // 수동 편집 배지
+                if (dayData?.manuallyEdited) {
+                    html += '<div class="manual-edit-badge">수정</div>';
+                }
+
+                // 날짜 숫자
+                html += `<div class="${numberClass}">${dateNum}</div>`;
+
+                if (isWeekend) {
+                    // 주말
+                    html += '<div class="day-info" style="color: #aaa; font-size: 10px;">휴무</div>';
+                } else if (dayData) {
+                    // 평일 - 당직 정보 표시
+                    const primaries = Array.isArray(dayData.primaries) ? dayData.primaries : [dayData.primary];
+                    const secondaries = Array.isArray(dayData.secondaries) ? dayData.secondaries : [dayData.secondary];
+
+                    if (isEditing) {
+                        // 편집 모드
+                        let editHTML = '<div class="edit-controls" style="margin-top: 5px;">';
+
+                        primaries.forEach((name, i) => {
+                            editHTML += `
+                                <div style="margin-bottom: 3px;">
+                                    <label style="font-size: 10px; margin: 0; color: #e74c3c;">당직${primaries.length > 1 ? (i + 1) : ''}</label>
+                                    <select id="editPrimary_${scheduleIndex}_${i}" style="font-size: 11px; padding: 3px;">
+                                        ${people.map(p => `<option value="${p.name}" ${p.name === name ? 'selected' : ''}>${p.name}</option>`).join('')}
+                                    </select>
+                                </div>
+                            `;
+                        });
+
+                        secondaries.forEach((name, i) => {
+                            editHTML += `
+                                <div style="margin-bottom: 3px;">
+                                    <label style="font-size: 10px; margin: 0; color: #3498db;">2nd${secondaries.length > 1 ? (i + 1) : ''}</label>
+                                    <select id="editSecondary_${scheduleIndex}_${i}" style="font-size: 11px; padding: 3px;">
+                                        ${people.map(p => `<option value="${p.name}" ${p.name === name ? 'selected' : ''}>${p.name}</option>`).join('')}
+                                    </select>
+                                </div>
+                            `;
+                        });
+
+                        editHTML += `
+                            <div style="margin-top: 5px;">
+                                <button onclick="saveEdit(${scheduleIndex})" style="background: #27ae60; padding: 3px 8px; font-size: 10px;">저장</button>
+                                <button onclick="cancelEdit()" class="secondary" style="padding: 3px 8px; font-size: 10px;">취소</button>
+                            </div>
+                        </div>`;
+
+                        html += editHTML;
+                    } else {
+                        // 표시 모드
+                        html += `<div class="day-info" style="font-size: 10px; color: #888;">Day ${dayNumber}</div>`;
+                        html += '<div class="duty-assignment" style="font-size: 11px; margin-top: 3px;">';
+                        primaries.forEach(name => {
+                            html += `<div class="duty-primary" style="font-size: 11px;">🔴 ${name}</div>`;
+                        });
+                        secondaries.forEach(name => {
+                            if (name) html += `<div class="duty-secondary" style="font-size: 11px;">🔵 ${name}</div>`;
+                        });
+                        html += '</div>';
+
+                        // 휴가자 표시
+                        const vacationers = people.filter(p => p.isOnVacation(dayNumber)).map(p => p.name);
+                        if (vacationers.length > 0) {
+                            html += `<div class="vacation-indicator" style="font-size: 9px; padding: 2px;">🏖️ ${vacationers.join(', ')}</div>`;
+                        }
+                    }
+                } else if (!isWeekend && dayNumber) {
+                    // 평일이지만 스케줄 없음
+                    html += `<div class="day-info" style="font-size: 10px; color: #888;">Day ${dayNumber}</div>`;
+                    html += '<div style="font-size: 10px; color: #ccc;">미배정</div>';
+                }
+
+                html += '</div>';
+            }
+
+            // 빈 칸 (월 끝 후)
+            const totalCells = firstDayOfWeek + daysInMonth;
+            const remainingCells = (7 - (totalCells % 7)) % 7;
+            for (let i = 0; i < remainingCells; i++) {
+                html += '<div class="calendar-day empty"></div>';
+            }
+
             html += '</div>';
             calendarDiv.innerHTML = html;
         }
