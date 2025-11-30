@@ -374,6 +374,156 @@ title: 병원 당직표 생성기
             font-size: 12px;
             margin: 3px;
         }
+
+        /* Calendar Preview Styles */
+        .calendar-preview-section {
+            background: #f0f7ff;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 2px solid #3498db;
+        }
+
+        .calendar-preview-section h3 {
+            color: #2c3e50;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+
+        .month-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .month-selector select {
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+
+        .month-selector button {
+            padding: 10px 20px;
+        }
+
+        .preview-calendar {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+            margin-top: 15px;
+        }
+
+        .preview-calendar-header {
+            background: #2c3e50;
+            color: white;
+            padding: 10px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .preview-calendar-header.sunday {
+            background: #c0392b;
+        }
+
+        .preview-calendar-header.saturday {
+            background: #2980b9;
+        }
+
+        .preview-day {
+            background: white;
+            padding: 8px;
+            min-height: 60px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .preview-day.empty {
+            background: #f5f5f5;
+        }
+
+        .preview-day.sunday {
+            background: #fee;
+            color: #c0392b;
+        }
+
+        .preview-day.saturday {
+            background: #e8f4fd;
+            color: #2980b9;
+        }
+
+        .preview-day.holiday {
+            background: #ffeaa7;
+            border: 2px solid #f39c12;
+        }
+
+        .preview-day.holiday.sunday {
+            background: #fab1a0;
+        }
+
+        .preview-day .day-num {
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .preview-day .holiday-name {
+            font-size: 11px;
+            color: #e74c3c;
+            font-weight: 600;
+            margin-top: 3px;
+        }
+
+        .preview-day .weekday-indicator {
+            font-size: 10px;
+            color: #27ae60;
+            margin-top: 2px;
+        }
+
+        .month-summary {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+
+        .month-summary-item {
+            text-align: center;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .month-summary-item.total-days {
+            background: #e8f4fd;
+            border-left: 4px solid #3498db;
+        }
+
+        .month-summary-item.workdays {
+            background: #d4edda;
+            border-left: 4px solid #27ae60;
+        }
+
+        .month-summary-item.holidays {
+            background: #ffeaa7;
+            border-left: 4px solid #f39c12;
+        }
+
+        .month-summary-item .number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .month-summary-item .label {
+            font-size: 12px;
+            color: #7f8c8d;
+        }
     </style>
 </head>
 <body>
@@ -435,6 +585,33 @@ title: 병원 당직표 생성기
         <div class="result-section">
             <h2>📅 당직표</h2>
 
+            <!-- Calendar Preview Section -->
+            <div class="calendar-preview-section">
+                <h3>📆 월 선택 및 캘린더 미리보기</h3>
+                <div class="month-selector">
+                    <select id="selectYear">
+                        <!-- Will be populated by JS -->
+                    </select>
+                    <span>년</span>
+                    <select id="selectMonth">
+                        <option value="1">1월</option>
+                        <option value="2">2월</option>
+                        <option value="3">3월</option>
+                        <option value="4">4월</option>
+                        <option value="5">5월</option>
+                        <option value="6">6월</option>
+                        <option value="7">7월</option>
+                        <option value="8">8월</option>
+                        <option value="9">9월</option>
+                        <option value="10">10월</option>
+                        <option value="11">11월</option>
+                        <option value="12">12월</option>
+                    </select>
+                    <button onclick="showCalendarPreview()">📅 미리보기</button>
+                </div>
+                <div id="calendarPreview"></div>
+            </div>
+
             <div class="button-group">
                 <button onclick="generateSchedule()">🎯 당직표 생성</button>
                 <button onclick="exportSchedule()" class="secondary">💾 내보내기</button>
@@ -454,9 +631,288 @@ title: 병원 당직표 생성기
         // Global data
         let people = [];
         let schedule = null;
+        let selectedYear = new Date().getFullYear();
+        let selectedMonth = new Date().getMonth() + 1;
+        let workdaysInMonth = [];
+
         const DAYS_OF_WEEK = ['월', '화', '수', '목', '금'];
-        const TOTAL_DAYS = 20;
-        const WEEKS = 4;
+        let TOTAL_DAYS = 20;
+        let WEEKS = 4;
+
+        // 대한민국 공휴일 데이터
+        // 양력 고정 공휴일
+        const FIXED_HOLIDAYS = {
+            '01-01': '신정',
+            '03-01': '삼일절',
+            '05-05': '어린이날',
+            '06-06': '현충일',
+            '08-15': '광복절',
+            '10-03': '개천절',
+            '10-09': '한글날',
+            '12-25': '크리스마스'
+        };
+
+        // 음력 기반 공휴일 (양력 변환 - 2024~2030년)
+        const LUNAR_HOLIDAYS = {
+            2024: {
+                '02-09': '설날 연휴',
+                '02-10': '설날',
+                '02-11': '설날 연휴',
+                '02-12': '대체공휴일(설날)',
+                '05-15': '부처님오신날',
+                '09-16': '추석 연휴',
+                '09-17': '추석',
+                '09-18': '추석 연휴'
+            },
+            2025: {
+                '01-28': '설날 연휴',
+                '01-29': '설날',
+                '01-30': '설날 연휴',
+                '05-05': '부처님오신날',
+                '10-05': '추석 연휴',
+                '10-06': '추석',
+                '10-07': '추석 연휴',
+                '10-08': '대체공휴일(추석)'
+            },
+            2026: {
+                '02-16': '설날 연휴',
+                '02-17': '설날',
+                '02-18': '설날 연휴',
+                '05-24': '부처님오신날',
+                '09-24': '추석 연휴',
+                '09-25': '추석',
+                '09-26': '추석 연휴'
+            },
+            2027: {
+                '02-06': '설날 연휴',
+                '02-07': '설날',
+                '02-08': '설날 연휴',
+                '02-09': '대체공휴일(설날)',
+                '05-13': '부처님오신날',
+                '09-14': '추석 연휴',
+                '09-15': '추석',
+                '09-16': '추석 연휴'
+            },
+            2028: {
+                '01-26': '설날 연휴',
+                '01-27': '설날',
+                '01-28': '설날 연휴',
+                '05-02': '부처님오신날',
+                '10-02': '추석 연휴',
+                '10-03': '추석',
+                '10-04': '추석 연휴'
+            },
+            2029: {
+                '02-12': '설날 연휴',
+                '02-13': '설날',
+                '02-14': '설날 연휴',
+                '05-20': '부처님오신날',
+                '09-21': '추석 연휴',
+                '09-22': '추석',
+                '09-23': '추석 연휴'
+            },
+            2030: {
+                '02-02': '설날 연휴',
+                '02-03': '설날',
+                '02-04': '설날 연휴',
+                '05-09': '부처님오신날',
+                '09-11': '추석 연휴',
+                '09-12': '추석',
+                '09-13': '추석 연휴'
+            }
+        };
+
+        // 공휴일 조회 함수
+        function getHoliday(year, month, day) {
+            const monthStr = String(month).padStart(2, '0');
+            const dayStr = String(day).padStart(2, '0');
+            const dateKey = `${monthStr}-${dayStr}`;
+
+            // 양력 고정 공휴일 확인
+            if (FIXED_HOLIDAYS[dateKey]) {
+                return FIXED_HOLIDAYS[dateKey];
+            }
+
+            // 음력 기반 공휴일 확인
+            if (LUNAR_HOLIDAYS[year] && LUNAR_HOLIDAYS[year][dateKey]) {
+                return LUNAR_HOLIDAYS[year][dateKey];
+            }
+
+            return null;
+        }
+
+        // 대체공휴일 확인 (일요일과 겹치는 공휴일)
+        function getSubstituteHoliday(year, month, day) {
+            const date = new Date(year, month - 1, day);
+            const dayOfWeek = date.getDay(); // 0: 일요일
+
+            // 어린이날 대체공휴일 (토/일 겹칠 때)
+            if (month === 5 && day === 6 && dayOfWeek === 1) {
+                const prevDate = new Date(year, month - 1, 5);
+                if (prevDate.getDay() === 0 || prevDate.getDay() === 6) {
+                    return '대체공휴일(어린이날)';
+                }
+            }
+            if (month === 5 && day === 7 && dayOfWeek === 1) {
+                const prevDate = new Date(year, month - 1, 5);
+                if (prevDate.getDay() === 6) {
+                    return '대체공휴일(어린이날)';
+                }
+            }
+
+            return null;
+        }
+
+        // 캘린더 미리보기 표시
+        function showCalendarPreview() {
+            const year = parseInt(document.getElementById('selectYear').value);
+            const month = parseInt(document.getElementById('selectMonth').value);
+
+            selectedYear = year;
+            selectedMonth = month;
+
+            renderCalendarPreview(year, month);
+        }
+
+        // 캘린더 프리뷰 렌더링
+        function renderCalendarPreview(year, month) {
+            const previewDiv = document.getElementById('calendarPreview');
+            const firstDay = new Date(year, month - 1, 1);
+            const lastDay = new Date(year, month, 0);
+            const daysInMonth = lastDay.getDate();
+            const startDayOfWeek = firstDay.getDay(); // 0: 일요일
+
+            let html = '<div class="preview-calendar">';
+
+            // 요일 헤더
+            const dayHeaders = ['일', '월', '화', '수', '목', '금', '토'];
+            dayHeaders.forEach((day, index) => {
+                let headerClass = 'preview-calendar-header';
+                if (index === 0) headerClass += ' sunday';
+                if (index === 6) headerClass += ' saturday';
+                html += `<div class="${headerClass}">${day}</div>`;
+            });
+
+            // 빈 칸 (월 시작 전)
+            for (let i = 0; i < startDayOfWeek; i++) {
+                html += '<div class="preview-day empty"></div>';
+            }
+
+            // 날짜 채우기
+            let workdays = 0;
+            let holidays = 0;
+            workdaysInMonth = [];
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const date = new Date(year, month - 1, day);
+                const dayOfWeek = date.getDay();
+                const holiday = getHoliday(year, month, day) || getSubstituteHoliday(year, month, day);
+
+                let dayClass = 'preview-day';
+                if (dayOfWeek === 0) dayClass += ' sunday';
+                if (dayOfWeek === 6) dayClass += ' saturday';
+                if (holiday) {
+                    dayClass += ' holiday';
+                    holidays++;
+                }
+
+                let dayContent = `<div class="day-num">${day}</div>`;
+                if (holiday) {
+                    dayContent += `<div class="holiday-name">${holiday}</div>`;
+                }
+
+                // 평일 표시 (월~금, 공휴일 아닌 날)
+                const isWorkday = dayOfWeek >= 1 && dayOfWeek <= 5 && !holiday;
+                if (isWorkday) {
+                    workdays++;
+                    workdaysInMonth.push({
+                        day: day,
+                        dayOfWeek: DAYS_OF_WEEK[dayOfWeek - 1],
+                        date: date
+                    });
+                    dayContent += `<div class="weekday-indicator">당직 ${workdays}일차</div>`;
+                }
+
+                html += `<div class="${dayClass}">${dayContent}</div>`;
+            }
+
+            // 빈 칸 (월 끝 후)
+            const totalCells = startDayOfWeek + daysInMonth;
+            const remainingCells = 7 - (totalCells % 7);
+            if (remainingCells < 7) {
+                for (let i = 0; i < remainingCells; i++) {
+                    html += '<div class="preview-day empty"></div>';
+                }
+            }
+
+            html += '</div>';
+
+            // 요약 정보
+            const weekends = daysInMonth - workdays - holidays + (holidays > 0 ? countWeekendHolidays(year, month) : 0);
+            html += `
+                <div class="month-summary">
+                    <div class="month-summary-item total-days">
+                        <div class="number">${daysInMonth}</div>
+                        <div class="label">총 일수</div>
+                    </div>
+                    <div class="month-summary-item workdays">
+                        <div class="number">${workdays}</div>
+                        <div class="label">평일 (당직 대상)</div>
+                    </div>
+                    <div class="month-summary-item holidays">
+                        <div class="number">${holidays}</div>
+                        <div class="label">공휴일</div>
+                    </div>
+                </div>
+                <div class="alert alert-info" style="margin-top: 15px;">
+                    📌 <strong>${year}년 ${month}월</strong>은 평일 <strong>${workdays}일</strong>입니다.
+                    당직표 생성 시 이 정보를 기준으로 합니다.
+                </div>
+            `;
+
+            // 당직 일수 업데이트
+            TOTAL_DAYS = workdays;
+            WEEKS = Math.ceil(workdays / 5);
+
+            previewDiv.innerHTML = html;
+        }
+
+        // 주말과 겹치는 공휴일 수 계산
+        function countWeekendHolidays(year, month) {
+            let count = 0;
+            const lastDay = new Date(year, month, 0).getDate();
+
+            for (let day = 1; day <= lastDay; day++) {
+                const date = new Date(year, month - 1, day);
+                const dayOfWeek = date.getDay();
+                const holiday = getHoliday(year, month, day);
+
+                if (holiday && (dayOfWeek === 0 || dayOfWeek === 6)) {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        // 년도 선택 초기화
+        function initYearSelector() {
+            const yearSelect = document.getElementById('selectYear');
+            const currentYear = new Date().getFullYear();
+
+            for (let year = currentYear - 1; year <= currentYear + 5; year++) {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                if (year === currentYear) option.selected = true;
+                yearSelect.appendChild(option);
+            }
+
+            // 현재 월 선택
+            const monthSelect = document.getElementById('selectMonth');
+            const currentMonth = new Date().getMonth() + 1;
+            monthSelect.value = currentMonth;
+        }
 
         // Person class
         class Person {
@@ -841,6 +1297,11 @@ title: 병원 당직표 생성기
                 return;
             }
 
+            if (workdaysInMonth.length === 0) {
+                showMessage('먼저 미리보기 버튼을 눌러 월을 선택해주세요.', 'error');
+                return;
+            }
+
             // Reset counts
             people.forEach(p => {
                 p.primaryCount = 0;
@@ -865,11 +1326,13 @@ title: 병원 당직표 생성기
 
                 success = true;
 
-                for (let day = 0; day < TOTAL_DAYS; day++) {
-                    const week = Math.floor(day / 5);
+                for (let idx = 0; idx < workdaysInMonth.length; idx++) {
+                    const workday = workdaysInMonth[idx];
+                    const week = Math.floor(idx / 5);
                     const weekNumber = week + 1;
-                    const dayOfWeek = DAYS_OF_WEEK[day % 5];
-                    const dayNumber = day + 1;
+                    const dayOfWeek = workday.dayOfWeek;
+                    const dayNumber = idx + 1; // 당직 일차 (1부터)
+                    const actualDate = workday.day; // 실제 날짜
 
                     // Find primary duty
                     const primaryCandidates = people.filter(p =>
@@ -912,10 +1375,13 @@ title: 병원 당직표 생성기
 
                     schedule.push({
                         day: dayNumber,
+                        actualDate: actualDate,
                         week: weekNumber,
                         dayOfWeek: dayOfWeek,
                         primary: primary.name,
-                        secondary: secondary.name
+                        secondary: secondary.name,
+                        month: selectedMonth,
+                        year: selectedYear
                     });
 
                     primary.primaryCount++;
@@ -930,7 +1396,7 @@ title: 병원 당직표 생성기
                 return;
             }
 
-            showMessage(`당직표가 성공적으로 생성되었습니다! (${attempts}번 시도)`, 'success');
+            showMessage(`${selectedYear}년 ${selectedMonth}월 당직표가 성공적으로 생성되었습니다! (${attempts}번 시도)`, 'success');
             renderCalendar();
             renderStatistics();
         }
@@ -956,7 +1422,10 @@ title: 병원 당직표 생성기
                 return;
             }
 
-            let html = '<div class="calendar">';
+            // 캘린더 제목 추가
+            const firstDay = schedule[0];
+            let html = `<h3 style="margin-bottom: 15px; color: #2c3e50;">${firstDay.year}년 ${firstDay.month}월 당직표</h3>`;
+            html += '<div class="calendar">';
             schedule.forEach((day, index) => {
                 // Check who is on vacation this day
                 const vacationers = people.filter(p => p.isOnVacation(day.day))
@@ -978,7 +1447,7 @@ title: 병원 당직표 생성기
                     // Edit mode
                     contentHTML = `
                         <div class="day-header">
-                            <span class="day-number">Day ${day.day}</span> ${day.dayOfWeek}요일
+                            <span class="day-number">${day.month}/${day.actualDate}</span> ${day.dayOfWeek}요일
                         </div>
                         <div class="edit-controls">
                             <label style="font-size: 12px; margin: 0;">당직 (Primary)</label>
@@ -999,7 +1468,8 @@ title: 병원 당직표 생성기
                     // Display mode
                     contentHTML = `
                         <div class="day-header">
-                            <span class="day-number">Day ${day.day}</span> ${day.dayOfWeek}요일
+                            <span class="day-number">${day.month}/${day.actualDate}</span> ${day.dayOfWeek}요일
+                            <span style="font-size: 11px; color: #7f8c8d; margin-left: 5px;">(${day.day}일차)</span>
                         </div>
                         <div class="duty-assignment">
                             <div class="duty-primary">🔴 ${day.primary}</div>
@@ -1129,14 +1599,15 @@ title: 병원 당직표 생성기
                 return;
             }
 
-            let text = '병원 당직표\n\n';
+            const firstDay = schedule[0];
+            let text = `병원 당직표 - ${firstDay.year}년 ${firstDay.month}월\n\n`;
 
             // Schedule
             schedule.forEach(day => {
                 const vacationers = people.filter(p => p.isOnVacation(day.day)).map(p => p.name);
                 let vacInfo = vacationers.length > 0 ? ` (휴가: ${vacationers.join(', ')})` : '';
                 let editInfo = day.manuallyEdited ? ' [수동편집]' : '';
-                text += `Day ${day.day} (${day.dayOfWeek}): 당직 ${day.primary}, 2nd ${day.secondary}${vacInfo}${editInfo}\n`;
+                text += `${day.month}/${day.actualDate} ${day.dayOfWeek}요일 (${day.day}일차): 당직 ${day.primary}, 2nd ${day.secondary}${vacInfo}${editInfo}\n`;
             });
 
             // Statistics
@@ -1175,7 +1646,7 @@ title: 병원 당직표 생성기
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = '당직표_' + new Date().toISOString().slice(0, 10) + '.txt';
+            a.download = `당직표_${firstDay.year}년${firstDay.month}월.txt`;
             a.click();
             URL.revokeObjectURL(url);
 
@@ -1183,7 +1654,9 @@ title: 병원 당직표 생성기
         }
 
         // Initialize
+        initYearSelector();
         renderPersonList();
+        showCalendarPreview(); // 페이지 로드 시 현재 월 미리보기 표시
     </script>
 </body>
 </html>
